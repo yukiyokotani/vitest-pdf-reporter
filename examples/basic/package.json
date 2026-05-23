@@ -1,0 +1,16 @@
+{
+  "name": "vitest-pdf-reporter-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "vitest-pdf-reporter": "workspace:*"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0",
+    "vitest": "^2.1.8"
+  }
+}
