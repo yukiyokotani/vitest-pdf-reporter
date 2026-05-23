@@ -466,6 +466,15 @@ function renderDetailsSection(view: View, opts: ResolvedPdfReporterOptions): str
 </section>`
 }
 
+function renderSectionSummary(s: ViewSection): string {
+  if (s.summary.total === 0) return '<span class="section__summary"></span>'
+  const cls = s.summary.failed > 0
+    ? 'section__summary section__summary--fail'
+    : 'section__summary'
+  const pct = Math.round((s.summary.passed / s.summary.total) * 100)
+  return `<span class="${cls}"><span class="section__summary-count">${s.summary.passed}/${s.summary.total}</span><span class="section__summary-pct">${pct}%</span></span>`
+}
+
 function renderSection(s: ViewSection, opts: ResolvedPdfReporterOptions): string {
   const sectionCases = s.cases.length > 0
     ? `<ol class="cases">${s.cases.map((c) => renderCase(c, opts)).join('')}</ol>`
@@ -481,6 +490,7 @@ function renderSection(s: ViewSection, opts: ResolvedPdfReporterOptions): string
   <header class="section__head">
     <span class="section__num">${esc(s.number)}</span>
     <${headingTag} class="section__title">${esc(s.name)}</${headingTag}>
+    ${renderSectionSummary(s)}
   </header>
   ${subtitle}
   ${sectionCases}
@@ -948,13 +958,37 @@ a { color: inherit; text-decoration: none; }
 }
 .section__head {
   display: grid;
-  grid-template-columns: var(--rail-w) 1fr;
+  grid-template-columns: var(--rail-w) 1fr auto;
   gap: var(--rail-gap);
   align-items: baseline;
   padding-bottom: 2.6mm;
   border-bottom: 2px solid hsl(var(--foreground));
   margin-bottom: 4mm;
 }
+.section__summary {
+  font-size: 8pt;
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+  font-feature-settings: "tnum" 1;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2mm;
+}
+.section__summary--fail { color: hsl(var(--destructive)); }
+.section__summary-count {
+  font-weight: 600;
+}
+.section__summary-pct {
+  color: hsl(var(--muted-foreground));
+  font-size: 7pt;
+}
+.section__summary--fail .section__summary-pct { color: hsl(var(--destructive)); }
+.section--d1 .section__summary { font-size: 11pt; }
+.section--d1 .section__summary-pct { font-size: 9pt; }
+.section--d2 .section__summary { font-size: 9pt; }
+.section--d2 .section__summary-pct { font-size: 7.4pt; }
 /* Section number and title are on the same row, share the same baseline,
  * and use the same font-size at each depth. Only the weight + color
  * differ. */

@@ -23,25 +23,25 @@ function createUser(input: { email: string; name: string }): User {
   return u
 }
 
-describe('ユーザー管理API', () => {
-  describe('POST /users — ユーザー作成', () => {
-    describe('正常系', () => {
-      it('必須項目のみでユーザーを作成できること', ({ task }) => {
+describe('User Management API', () => {
+  describe('POST /users — Create user', () => {
+    describe('Happy path', () => {
+      it('creates a user with only the required fields', ({ task }) => {
         task.meta.requirementId = 'REQ-USER-001'
-        task.meta.priority = '高'
-        task.meta.category = '正常系'
-        task.meta.precondition = '未登録のメールアドレスであること'
-        task.meta.description = 'email / name を渡すと新しい User が返る。id は自動採番。'
+        task.meta.priority = 'high'
+        task.meta.category = 'normal'
+        task.meta.precondition = 'Email is not yet registered.'
+        task.meta.description = 'email + name returns a new User; id is auto-assigned.'
 
         const u = createUser({ email: 'alice@example.com', name: 'Alice' })
         expect(u.id).toMatch(/^u_/)
         expect(u.email).toBe('alice@example.com')
       })
 
-      it('複数ユーザーを連続して作成できること', ({ task }) => {
+      it('creates multiple users in sequence', ({ task }) => {
         task.meta.requirementId = 'REQ-USER-003'
-        task.meta.priority = '中'
-        task.meta.category = '正常系'
+        task.meta.priority = 'medium'
+        task.meta.category = 'normal'
 
         const a = createUser({ email: 'bob@example.com', name: 'Bob' })
         const b = createUser({ email: 'carol@example.com', name: 'Carol' })
@@ -49,12 +49,12 @@ describe('ユーザー管理API', () => {
       })
     })
 
-    describe('異常系', () => {
-      it('メールアドレスが重複している場合、409 を返すこと', ({ task }) => {
+    describe('Edge cases', () => {
+      it('returns 409 when the email is already in use', ({ task }) => {
         task.meta.requirementId = 'REQ-USER-002'
-        task.meta.priority = '高'
-        task.meta.category = '異常系'
-        task.meta.note = '重複検出はメールアドレスの完全一致のみ'
+        task.meta.priority = 'high'
+        task.meta.category = 'edge'
+        task.meta.note = 'Duplicate detection is an exact match on the email field only.'
 
         expect(() => createUser({ email: 'alice@example.com', name: 'Alice Two' })).toThrow(
           /already in use/,
@@ -63,32 +63,33 @@ describe('ユーザー管理API', () => {
     })
   })
 
-  describe('GET /users/:id — ユーザー取得', () => {
-    it.skip('指定 ID のユーザーを返すこと', ({ task }) => {
+  describe('GET /users/:id — Get user', () => {
+    it.skip('returns the user matching the given id', ({ task }) => {
       task.meta.requirementId = 'REQ-USER-010'
-      task.meta.priority = '中'
-      // 未実装
+      task.meta.priority = 'medium'
+      // Not implemented yet.
     })
 
-    it.todo('存在しない ID の場合、404 を返すこと')
+    it.todo('returns 404 when the id does not exist')
   })
 })
 
-describe('認証フロー', () => {
-  describe('POST /sessions — ログイン', () => {
-    it('正しい認証情報でログインできること', ({ task }) => {
+describe('Authentication flow', () => {
+  describe('POST /sessions — Sign in', () => {
+    it('signs in with valid credentials', ({ task }) => {
       task.meta.requirementId = 'REQ-AUTH-001'
-      task.meta.priority = '高'
-      task.meta.category = '正常系'
-      task.meta.description = 'パスワードは bcrypt 比較。成功時は session cookie を Set-Cookie。'
+      task.meta.priority = 'high'
+      task.meta.category = 'normal'
+      task.meta.description =
+        'Password is bcrypt-compared. On success, the response sets a session cookie.'
       expect(true).toBe(true)
     })
 
-    it('連続失敗 5 回でアカウントをロックすること', ({ task }) => {
+    it('locks the account after 5 consecutive failures', ({ task }) => {
       task.meta.requirementId = 'REQ-AUTH-005'
-      task.meta.priority = '高'
-      task.meta.category = '異常系'
-      task.meta.precondition = '同一 IP / 同一アカウントでの 5 回連続失敗'
+      task.meta.priority = 'high'
+      task.meta.category = 'edge'
+      task.meta.precondition = '5 consecutive failures from the same IP / account'
       // Intentional failure to demonstrate failure rendering.
       const attempts = 5
       const lockedAfter = 6

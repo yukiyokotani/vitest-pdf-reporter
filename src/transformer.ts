@@ -20,6 +20,15 @@ export interface ViewCase {
   error?: SpecError
 }
 
+/** Aggregate of all cases at or below a section. */
+export interface ViewSectionSummary {
+  total: number
+  passed: number
+  failed: number
+  skipped: number
+  todo: number
+}
+
 export interface ViewSection {
   id: string
   number: string
@@ -29,6 +38,7 @@ export interface ViewSection {
   subtitle?: string
   cases: ViewCase[]
   children: ViewSection[]
+  summary: ViewSectionSummary
 }
 
 export interface ViewTocEntry {
@@ -98,6 +108,24 @@ function buildSection(
     buildSection(g, [...numberPath, i + 1], depth + 1, undefined),
   )
 
+  const summary: ViewSectionSummary = { total: 0, passed: 0, failed: 0, skipped: 0, todo: 0 }
+  for (const c of directCases) {
+    summary.total += 1
+    switch (c.status) {
+      case 'pass': summary.passed += 1; break
+      case 'fail': summary.failed += 1; break
+      case 'skip': summary.skipped += 1; break
+      case 'todo': summary.todo += 1; break
+    }
+  }
+  for (const child of children) {
+    summary.total += child.summary.total
+    summary.passed += child.summary.passed
+    summary.failed += child.summary.failed
+    summary.skipped += child.summary.skipped
+    summary.todo += child.summary.todo
+  }
+
   const section: ViewSection = {
     id: nextId('sec'),
     number: numberPath.join('.'),
@@ -105,6 +133,7 @@ function buildSection(
     name: node.name,
     cases: directCases,
     children,
+    summary,
   }
   if (subtitle) section.subtitle = subtitle
   return section
