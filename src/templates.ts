@@ -590,18 +590,25 @@ a { color: inherit; text-decoration: none; }
  * anywhere in this document. Variants differentiate via border + text +
  * icon color, never via fill. Geometry (padding, font-size, border-
  * radius, weight) is identical across all variants. */
-/* Badge — shadcn-faithful defaults. The shadcn source uses:
- *   inline-flex items-center justify-center rounded-md border
- *   px-2 py-0.5 text-xs font-medium [&>svg]:size-3 gap-1
- * Variants tint the border + icon accent only. Text is always
- * foreground (black). No fills. */
+/* Badge — verbatim copy of shadcn v4 Badge's base class string at print
+ * scale. Reference:
+ *   inline-flex w-fit shrink-0 items-center justify-center gap-1
+ *   overflow-hidden rounded-full border border-transparent px-2 py-0.5
+ *   text-xs font-medium whitespace-nowrap [&>svg]:size-3
+ *
+ * We use the BadgeCheck-style outline pattern (border + foreground text,
+ * no fill). Variants tint the border + the icon accent color only —
+ * text always stays foreground (black). */
 .badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: calc(var(--radius) - 2px);
+  width: fit-content;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 999px;
   background: transparent;
-  border: 1px solid hsl(var(--border-strong));
+  border: 1px solid hsl(var(--border));
   color: hsl(var(--foreground));
   padding: 0.4mm 1.6mm;
   font-size: 7pt;
@@ -611,12 +618,12 @@ a { color: inherit; text-decoration: none; }
   white-space: nowrap;
   font-feature-settings: "tnum" 1;
 }
-.badge--outline { /* default neutral */ }
+.badge--outline { /* default neutral border + foreground text */ }
 .badge--destructive { border-color: hsl(var(--destructive)); }
 .badge--success { border-color: hsl(var(--success)); }
 .badge--warning { border-color: hsl(var(--warning)); }
-.badge--muted { border-color: hsl(var(--border-strong)); }
-.badge--secondary { border-color: hsl(var(--border-strong)); }
+.badge--muted { border-color: hsl(var(--border)); }
+.badge--secondary { border-color: hsl(var(--border)); }
 .badge--default { border-color: hsl(var(--foreground)); }
 
 /* shadcn icon sizing: [&>svg]:size-3 → 12px on web ≈ 2.5mm at print. */
