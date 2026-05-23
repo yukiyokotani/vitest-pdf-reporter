@@ -1,0 +1,41 @@
+---
+import '../styles/global.css'
+const { title = 'vitest-pdf-reporter', description = 'Turn your Vitest suite into a typeset PDF spec document.' } = Astro.props
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content={description} />
+  <title>{title}</title>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="brand" href={`${base}/`}>
+        <span class="brand__dot" aria-hidden="true"></span>
+        <span>vitest-pdf-reporter</span>
+      </a>
+      <nav class="nav">
+        <a href="#features">Features</a>
+        <a href="#usage">Usage</a>
+        <a href="#preview">Preview</a>
+        <a href="https://github.com/yukiyokotani/vitest-pdf-reporter">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <slot />
+  </main>
+
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      <span>MIT licensed · Built for Vitest 2.x+</span>
+      <span class="site-footer__sig">vitest-pdf-reporter</span>
+    </div>
+  </footer>
+</body>
+</html>

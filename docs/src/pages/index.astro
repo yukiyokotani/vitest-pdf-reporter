@@ -1,0 +1,223 @@
+---
+import Base from '../layouts/Base.astro'
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+---
+<Base title="vitest-pdf-reporter — typeset Vitest reports as PDF">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero__kind">TEST SPECIFICATION · NPM PACKAGE</div>
+      <div class="hero__accent"></div>
+      <h1 class="hero__title">Your test suite is the spec.</h1>
+      <p class="hero__lede">
+        A Vitest custom reporter that types your <code>describe</code> / <code>it</code> hierarchy
+        into a print-ready PDF — strict grid, editorial typography, one sharp accent color.
+        Designed to be shipped to customers, not stuffed into a build log.
+      </p>
+      <div class="hero__ctas">
+        <a class="btn btn--primary" href="#usage">Get started</a>
+        <a class="btn" href={`${base}/demo/spec.pdf`} target="_blank" rel="noopener">View sample PDF →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section__kicker">
+        <span class="section__num">01</span>
+        <h2 class="section__title">Designed like a document, not a build log.</h2>
+      </div>
+      <p class="section__lede">
+        Four ideas drive the default theme. Override anything via <code>customCss</code>,
+        or pass <code>theme: 'minimal'</code> for an achromatic editorial.
+      </p>
+
+      <div class="grid">
+        <div class="feature">
+          <div class="feature__num">001 · GRID</div>
+          <h3 class="feature__title">Strict modular grid</h3>
+          <p class="feature__body">
+            Section numbers live in a fixed column so the eye can scan vertical rules.
+            Margins and rhythm are stable across cover, TOC, and body.
+          </p>
+        </div>
+        <div class="feature">
+          <div class="feature__num">002 · COLOR</div>
+          <h3 class="feature__title">One accent color</h3>
+          <p class="feature__body">
+            A single crimson accent marks the cover bar, the headline pass-rate, top-level
+            section numbers, and failure highlights. Everything else is gray-scale.
+          </p>
+        </div>
+        <div class="feature">
+          <div class="feature__num">003 · TYPE</div>
+          <h3 class="feature__title">Tabular numerals</h3>
+          <p class="feature__body">
+            Durations, page numbers, pass rate, stat grids — all use tabular-nums so
+            columns visually align without manual tracking.
+          </p>
+        </div>
+        <div class="feature">
+          <div class="feature__num">004 · GROUPING</div>
+          <h3 class="feature__title">Hairline separators</h3>
+          <p class="feature__body">
+            Sub-sections separated by 0.5px hairlines; top-level sections start on fresh pages
+            with a bolder rule. Information density without visual noise.
+          </p>
+        </div>
+        <div class="feature">
+          <div class="feature__num">005 · META</div>
+          <h3 class="feature__title">First-class metadata</h3>
+          <p class="feature__body">
+            <code>task.meta</code> drives requirement IDs, priority badges, preconditions,
+            and notes — rendered as inline chips next to each test.
+          </p>
+        </div>
+        <div class="feature">
+          <div class="feature__num">006 · FAILURE</div>
+          <h3 class="feature__title">Failure-aware</h3>
+          <p class="feature__body">
+            Failing tests are highlighted, with assertion diffs and trimmed stack traces
+            inline. No noise from framework internals.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- USAGE -->
+  <section class="section" id="usage">
+    <div class="container">
+      <div class="section__kicker">
+        <span class="section__num">02</span>
+        <h2 class="section__title">Install. Configure. Run.</h2>
+      </div>
+
+      <div class="split">
+        <div class="split__copy">
+          <p class="eyebrow">step one</p>
+          <h3 style="margin-top:8px">Install</h3>
+          <p style="color: var(--fg-muted);">
+            Playwright ships Chromium. The reporter spins it up once per run to
+            print the HTML.
+          </p>
+        </div>
+        <div class="split__code">
+<pre><code>pnpm add -D vitest-pdf-reporter playwright
+pnpm exec playwright install chromium</code></pre>
+        </div>
+      </div>
+
+      <div class="split" style="margin-top: 56px;">
+        <div class="split__copy">
+          <p class="eyebrow">step two</p>
+          <h3 style="margin-top:8px">Wire it into Vitest</h3>
+          <p style="color: var(--fg-muted);">
+            Add as a reporter. Works alongside <code>'default'</code> or any other reporter.
+          </p>
+        </div>
+        <div class="split__code">
+<pre><code>{`// vitest.config.ts
+import { defineConfig } from 'vitest/config'
+import PdfReporter from 'vitest-pdf-reporter'
+
+export default defineConfig({
+  test: {
+    reporters: [
+      'default',
+      new PdfReporter({
+        outputFile: './test-reports/spec.pdf',
+        title: 'User Management API — Spec',
+        projectName: 'Acme Auth Service',
+        version: '1.2.0',
+      }),
+    ],
+  },
+})`}</code></pre>
+        </div>
+      </div>
+
+      <div class="split" style="margin-top: 56px;">
+        <div class="split__copy">
+          <p class="eyebrow">step three</p>
+          <h3 style="margin-top:8px">Annotate tests with <code>task.meta</code></h3>
+          <p style="color: var(--fg-muted);">
+            Optional. Anything you attach to <code>task.meta</code> appears in the PDF
+            as chips, preconditions, descriptions, or notes.
+          </p>
+        </div>
+        <div class="split__code">
+<pre><code>{`describe('User Management API', () => {
+  describe('POST /users', () => {
+    it('creates a user', ({ task }) => {
+      task.meta.requirementId = 'REQ-USER-001'
+      task.meta.priority = 'high'
+      task.meta.category = 'normal'
+      task.meta.precondition = 'email is unused'
+      // ...
+    })
+  })
+})`}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PREVIEW -->
+  <section class="section" id="preview">
+    <div class="container">
+      <div class="section__kicker">
+        <span class="section__num">03</span>
+        <h2 class="section__title">See it for yourself.</h2>
+      </div>
+      <p class="section__lede">
+        The PDF below is generated from the example suite in
+        <code>examples/basic/</code>. Pass and fail rendering, metadata chips,
+        and stack traces are all real.
+      </p>
+
+      <div class="preview">
+        <div class="preview__caption">
+          <p class="eyebrow">sample output</p>
+          <h3 style="margin-top: 8px;">User Management API — Spec</h3>
+          <p style="color: var(--fg-muted); font-size: 14px;">
+            7 tests · 4 pass · 1 fail · 1 skip · 1 todo · A4 portrait
+          </p>
+          <p style="margin-top: 16px;">
+            <a class="btn" href={`${base}/demo/spec.pdf`} target="_blank" rel="noopener">Open in new tab →</a>
+          </p>
+        </div>
+        <div class="preview__frame">
+          <embed src={`${base}/demo/spec.pdf`} type="application/pdf" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OPTIONS -->
+  <section class="section" id="options">
+    <div class="container">
+      <div class="section__kicker">
+        <span class="section__num">04</span>
+        <h2 class="section__title">Options.</h2>
+      </div>
+      <p class="section__lede">Every option is optional. Sensible defaults out of the box.</p>
+
+<pre><code>{`new PdfReporter({
+  outputFile: './test-reports/spec.pdf',  // default: './test-report.pdf'
+  title: 'My Test Spec',                   // cover title
+  projectName: 'Acme',                     // header + footer
+  version: '1.2.0',                        // shown under the title
+  locale: 'ja',                            // 'ja' | 'en'
+  paperSize: 'A4',                         // 'A4' | 'Letter'
+  orientation: 'portrait',                 // 'portrait' | 'landscape'
+  includeCoverPage: true,
+  includeTableOfContents: true,
+  includeStackTrace: true,
+  theme: 'default',                        // 'default' | 'minimal'
+  customCss: '/* override any token */',
+})`}</code></pre>
+    </div>
+  </section>
+</Base>
