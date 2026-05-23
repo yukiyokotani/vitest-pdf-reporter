@@ -956,30 +956,34 @@ a { color: inherit; text-decoration: none; }
   border-bottom: 2px solid hsl(var(--foreground));
   margin-bottom: 4mm;
 }
+/* Section summary: two fixed-width columns ("X/Y" and "Z%") aligned to
+ * the right. Uniform font-size / column widths across every depth so
+ * the count and the percentage form clean vertical columns down the
+ * page. */
 .section__summary {
-  font-size: 8pt;
+  display: inline-grid;
+  grid-template-columns: 12mm 10mm;
+  column-gap: 2mm;
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   color: hsl(var(--muted-foreground));
   font-weight: 500;
-  text-align: right;
-  white-space: nowrap;
-  font-feature-settings: "tnum" 1;
-  display: inline-flex;
+  font-size: 8.4pt;
   align-items: baseline;
-  gap: 2mm;
+  justify-self: end;
 }
-.section__summary--fail { color: hsl(var(--destructive)); }
 .section__summary-count {
+  text-align: right;
   font-weight: 600;
 }
 .section__summary-pct {
+  text-align: right;
+  font-size: 7.2pt;
   color: hsl(var(--muted-foreground));
-  font-size: 7pt;
 }
+.section__summary--fail { color: hsl(var(--destructive)); }
 .section__summary--fail .section__summary-pct { color: hsl(var(--destructive)); }
-.section--d1 .section__summary { font-size: 11pt; }
-.section--d1 .section__summary-pct { font-size: 9pt; }
-.section--d2 .section__summary { font-size: 9pt; }
-.section--d2 .section__summary-pct { font-size: 7.4pt; }
 /* Section number and title are on the same row, share the same baseline,
  * and use the same font-size at each depth. Only the weight + color
  * differ. */
