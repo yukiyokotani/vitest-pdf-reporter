@@ -50,9 +50,8 @@ function statusLabel(s: TestStatus): string {
 function priorityVariant(priority: string | undefined): string {
   if (!priority) return 'badge--outline'
   const p = priority.toLowerCase()
-  if (p === '高' || p === 'high') return 'badge--destructive'
-  if (p === '中' || p === 'medium' || p === 'mid') return 'badge--warning'
-  if (p === '低' || p === 'low') return 'badge--muted'
+  if (p === '高' || p === 'high') return 'badge--outline-destructive'
+  if (p === '中' || p === 'medium' || p === 'mid') return 'badge--outline-warning'
   return 'badge--outline'
 }
 
@@ -135,7 +134,7 @@ function gauge(view: View): string {
   </svg>
   <div class="gauge__center">
     <div class="gauge__num"><span>${pct.toFixed(1)}</span><span class="gauge__pct">%</span></div>
-    <div class="gauge__sub mono">${summary.passed} / ${summary.total}</div>
+    <div class="gauge__sub">${summary.passed} / ${summary.total}</div>
   </div>
 </div>`
 }
@@ -190,7 +189,7 @@ function renderCover(view: View): string {
   const inlineFailures = hasFailures && view.failures.length <= 5
   const previewId = inlineFailures ? FAILURES_ANCHOR : ''
   const previewMoreLink = !inlineFailures && hasFailures
-    ? `<a class="failures-card__more mono" href="#${FAILURES_ANCHOR}">${esc(L.viewAll)}</a>`
+    ? `<a class="failures-card__more" href="#${FAILURES_ANCHOR}">${esc(L.viewAll)}</a>`
     : ''
   const failurePreview = hasFailures
     ? `
@@ -262,7 +261,7 @@ function failureRow(f: ViewFailure): string {
           <span class="failure-row__num mono">${esc(f.sectionNumber)}</span>
           <span class="failure-row__name">${esc(f.name)}</span>
           ${f.requirementId ? `<span class="badge badge--outline mono failure-row__req">${esc(f.requirementId)}</span>` : `<span></span>`}
-          <span class="failure-row__arrow mono">→</span>
+          <span class="failure-row__arrow">→</span>
         </div>
         <div class="failure-row__path">${esc(f.sectionPath)}</div>
       </div>
@@ -324,7 +323,7 @@ function chips(meta: SpecMeta): string {
     out.push(`<span class="badge badge--outline mono">${esc(String(meta.requirementId))}</span>`)
   }
   if (meta.category) {
-    out.push(`<span class="badge badge--secondary">${esc(String(meta.category))}</span>`)
+    out.push(`<span class="badge badge--outline">${esc(String(meta.category))}</span>`)
   }
   if (meta.priority) {
     out.push(`<span class="badge ${priorityVariant(String(meta.priority))}">P ${esc(String(meta.priority))}</span>`)
@@ -379,7 +378,7 @@ function renderCase(c: ViewCase, opts: ResolvedPdfReporterOptions): string {
     <div class="case__body">
       <div class="case__top">
         <h4 class="case__name">${esc(c.name)}</h4>
-        <span class="case__duration mono">${fmtDuration(c.durationMs)}</span>
+        <span class="case__duration">${fmtDuration(c.durationMs)}</span>
       </div>
       ${chips(c.meta)}
       ${desc}
@@ -509,18 +508,19 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--radius);
 }
 
-/* Badge — shadcn variants. Used everywhere status / tags appear. */
+/* Badge — shadcn's stock styling. Default radius is rounded-md
+ * (calc(var(--radius) - 2px)), padding mirrors px-2.5 py-0.5 from
+ * shadcn (~2.4mm horizontal / ~0.6mm vertical at print). line-height
+ * 1 keeps text vertically centered. */
 .badge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   border-radius: calc(var(--radius) - 2px);
   border: 1px solid transparent;
-  padding: 0.4mm 1.8mm;
-  font-size: 6.6pt;
+  padding: 0.6mm 2.4mm;
+  font-size: 7pt;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  line-height: 1.35;
+  line-height: 1;
   white-space: nowrap;
   font-feature-settings: "tnum" 1;
 }
@@ -531,7 +531,6 @@ a { color: inherit; text-decoration: none; }
 .badge--secondary {
   background: hsl(var(--secondary));
   color: hsl(var(--secondary-foreground));
-  border-color: transparent;
 }
 .badge--destructive {
   background: hsl(var(--destructive));
@@ -553,27 +552,25 @@ a { color: inherit; text-decoration: none; }
   background: hsl(var(--background));
   border-color: hsl(var(--border-strong));
   color: hsl(var(--foreground));
-  font-weight: 500;
+}
+/* Tinted outline variants — same outline pattern, with the text + border
+ * tinted by intent. Used to differentiate priority levels without a fill. */
+.badge--outline-destructive {
+  background: hsl(var(--background));
+  border-color: hsl(var(--destructive) / 0.4);
+  color: hsl(var(--destructive));
+}
+.badge--outline-warning {
+  background: hsl(var(--background));
+  border-color: hsl(var(--warning) / 0.4);
+  color: hsl(var(--warning));
 }
 
-/* Status badge — uniform geometry across every variant so PASS / FAIL /
- * SKIP / TODO sit at the exact same height, width and weight in the rail.
- * Fully rounded pill shape (shadcn's recommended look for status chips). */
-.badge--status,
-.badge--status.badge--outline,
-.badge--status.badge--success,
-.badge--status.badge--destructive,
-.badge--status.badge--muted,
-.badge--status.badge--secondary,
-.badge--status.badge--warning {
-  min-width: 16mm;
-  height: 5mm;
-  padding: 0 2.4mm;
+/* Status pill — same base sizing as any other badge. Width comes from
+ * the content (PASS / FAIL / SKIP / TODO are all 4 chars, so they
+ * align naturally). The pill shape is the only deviation. */
+.badge--status {
   gap: 1mm;
-  font-size: 7.4pt;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1;
   border-radius: 999px;
 }
 .badge__icon {
@@ -586,12 +583,11 @@ a { color: inherit; text-decoration: none; }
 
 .eyebrow {
   display: inline-block;
-  font-family: "JetBrains Mono", "SF Mono", Menlo, ui-monospace, monospace;
-  font-size: 6.4pt;
-  letter-spacing: 0.22em;
+  font-size: 7pt;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: hsl(var(--muted-foreground));
-  font-weight: 500;
+  font-weight: 600;
 }
 .eyebrow--meta { color: hsl(var(--muted-foreground)); }
 
@@ -753,12 +749,11 @@ a { color: inherit; text-decoration: none; }
 }
 .kpi__inner { padding: 3mm 4mm; display: flex; flex-direction: column; gap: 1mm; height: 100%; }
 .kpi__label {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 6.4pt;
-  letter-spacing: 0.22em;
+  font-size: 7pt;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: hsl(var(--muted-foreground));
-  font-weight: 500;
+  font-weight: 600;
 }
 .kpi__num {
   font-size: 22pt;
@@ -773,8 +768,7 @@ a { color: inherit; text-decoration: none; }
 .kpi__num.is-skip { color: hsl(var(--muted-foreground)); }
 .kpi__num.is-todo { color: hsl(var(--warning)); }
 .kpi__num.is-mono {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 16pt;
+  font-size: 18pt;
 }
 .kpi__sub {
   font-size: 7pt;
@@ -789,8 +783,7 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   top: 3.4mm;
   right: 4mm;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 8pt;
+  font-size: 9pt;
   color: hsl(var(--muted-foreground));
 }
 .kpi__inner .bar__fill { background: hsl(var(--foreground)); }
@@ -917,17 +910,14 @@ a { color: inherit; text-decoration: none; }
   border-bottom: 2px solid hsl(var(--foreground));
   margin-bottom: 4mm;
 }
+/* Section number and title are on the same row, share the same baseline,
+ * and use the same font-size at each depth. Only the weight + color
+ * differ. */
 .section__num {
-  font-size: 11pt;
+  font-size: 22pt;
   color: hsl(var(--muted-foreground));
-  letter-spacing: 0.02em;
   font-weight: 500;
-  line-height: 1;
-}
-.section--d1 .section__num {
-  font-size: 14pt;
-  color: hsl(var(--foreground));
-  font-weight: 700;
+  line-height: 1.05;
 }
 .section__title {
   margin: 0;
@@ -943,6 +933,7 @@ a { color: inherit; text-decoration: none; }
   margin-top: 5mm;
   margin-bottom: 2.4mm;
 }
+.section--d2 .section__num { font-size: 13pt; line-height: 1.2; }
 .section--d2 .section__title { font-size: 13pt; font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; }
 .section--d3 .section__head {
   border-bottom: 1px solid hsl(var(--border));
@@ -950,6 +941,7 @@ a { color: inherit; text-decoration: none; }
   margin-top: 3.6mm;
   margin-bottom: 1.8mm;
 }
+.section--d3 .section__num { font-size: 10.6pt; line-height: 1.2; }
 .section--d3 .section__title { font-size: 10.6pt; font-weight: 700; letter-spacing: -0.005em; line-height: 1.2; }
 .section--d4 .section__head {
   border-bottom: 1px solid hsl(var(--border));
@@ -957,7 +949,9 @@ a { color: inherit; text-decoration: none; }
   margin-top: 3mm;
   margin-bottom: 1.4mm;
 }
+.section--d4 .section__num { font-size: 9.8pt; line-height: 1.2; }
 .section--d4 .section__title { font-size: 9.8pt; font-weight: 700; line-height: 1.2; }
+.section--d5 .section__num { font-size: 9.2pt; line-height: 1.2; }
 .section--d5 .section__title { font-size: 9.2pt; font-weight: 600; line-height: 1.2; }
 .section__subtitle {
   font-size: 7.6pt;
@@ -1030,10 +1024,7 @@ a { color: inherit; text-decoration: none; }
   line-height: 1.35;
 }
 .case__kv dt {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 6.6pt;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-size: 7.8pt;
   color: hsl(var(--muted-foreground));
   font-weight: 500;
   margin: 0;
@@ -1066,9 +1057,8 @@ a { color: inherit; text-decoration: none; }
 }
 .error__section { margin-top: 1.6mm; }
 .error__label {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 6.4pt;
-  letter-spacing: 0.22em;
+  font-size: 7pt;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: hsl(var(--destructive));
   font-weight: 700;
