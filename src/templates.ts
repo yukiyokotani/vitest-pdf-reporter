@@ -47,11 +47,10 @@ function statusLabel(s: TestStatus): string {
   return ({ pass: 'PASS', fail: 'FAIL', skip: 'SKIP', todo: 'TODO' } as const)[s]
 }
 
-function priorityVariant(priority: string | undefined): string {
-  if (!priority) return 'badge--outline'
-  const p = priority.toLowerCase()
-  if (p === '高' || p === 'high') return 'badge--outline-destructive'
-  if (p === '中' || p === 'medium' || p === 'mid') return 'badge--outline-warning'
+function priorityVariant(_priority: string | undefined): string {
+  // Priority chips are plain outline like every other metadata chip.
+  // The text content itself ("P 高" / "P 中" / "P 低") communicates the
+  // level; visual color emphasis was overkill for non-status info.
   return 'badge--outline'
 }
 
@@ -152,57 +151,7 @@ function renderCover(view: View): string {
   const { summary } = view
   const hasFailures = summary.failed > 0
   const hasToc = view.options.includeTableOfContents && view.toc.length > 0
-
-  const link = (target: string, body: string) =>
-    `<a class="kpi-link" href="#${target}">${body}</a>`
-
-  const kpi = (variant: '' | 'is-pass' | 'is-fail' | 'is-skip' | 'is-todo' | 'is-mono', label: string, value: string | number, sub?: string, bar?: number) => {
-    const barHtml = bar !== undefined
-      ? `<div class="bar"><div class="bar__fill" style="width:${bar}%"></div></div>`
-      : ''
-    return `
-      <div class="kpi__inner">
-        <div class="kpi__label">${esc(label)}</div>
-        <div class="kpi__num ${variant}">${esc(value)}</div>
-        ${sub ? `<div class="kpi__sub">${esc(sub)}</div>` : ''}
-        ${barHtml}
-      </div>`
-  }
-
-  const fileLabel = summary.fileCount === 1 ? 'file' : 'files'
-  const totalContent = kpi('', L.total, summary.total, `${summary.fileCount} ${fileLabel}`)
-  const totalCard = hasToc
-    ? `<div class="card kpi kpi--clickable">${link(TOC_ANCHOR, totalContent)}</div>`
-    : `<div class="card kpi">${totalContent}</div>`
-
-  const passedCard = `<div class="card kpi kpi--pass">${kpi('is-pass', L.passed, summary.passed, undefined, pctOf(summary.passed, summary.total))}</div>`
-
-  const failedContent = kpi('is-fail', L.failed, summary.failed, undefined, pctOf(summary.failed, summary.total))
-  const failedCard = hasFailures
-    ? `<div class="card kpi kpi--fail kpi--clickable">${link(FAILURES_ANCHOR, failedContent)}</div>`
-    : `<div class="card kpi">${failedContent}</div>`
-
-  const skippedCard = `<div class="card kpi">${kpi('is-skip', L.skipped, summary.skipped, undefined, pctOf(summary.skipped, summary.total))}</div>`
-  const todoCard = `<div class="card kpi">${kpi('is-todo', L.todo, summary.todo, undefined, pctOf(summary.todo, summary.total))}</div>`
-  const durationCard = `<div class="card kpi">${kpi('is-mono', L.duration, fmtDuration(summary.durationMs), `${L.generated} ${fmtDate(view.generatedAt)}`)}</div>`
-
-  const inlineFailures = hasFailures && view.failures.length <= 5
-  const previewId = inlineFailures ? FAILURES_ANCHOR : ''
-  const previewMoreLink = !inlineFailures && hasFailures
-    ? `<a class="failures-card__more" href="#${FAILURES_ANCHOR}">${esc(L.viewAll)}</a>`
-    : ''
-  const failurePreview = hasFailures
-    ? `
-    <div class="card failures-card"${previewId ? ` id="${previewId}"` : ''}>
-      <div class="failures-card__head">
-        <span class="eyebrow">${esc(L.failures)}</span>
-        ${previewMoreLink}
-      </div>
-      <ol class="failures-list">
-        ${view.failures.slice(0, 5).map((f) => failureRow(f)).join('')}
-      </ol>
-    </div>`
-    : ''
+  const pct = Math.max(0, Math.min(100, summary.passRate * 100))
 
   const headerMeta = [
     view.projectName,
@@ -213,10 +162,26 @@ function renderCover(view: View): string {
     .map((s) => esc(String(s)))
     .join(' · ')
 
+  const subParts: string[] = [`${summary.passed} of ${summary.total} tests passed`]
+  if (summary.failed) subParts.push(`${summary.failed} failed`)
+  if (summary.skipped) subParts.push(`${summary.skipped} skipped`)
+  if (summary.todo) subParts.push(`${summary.todo} todo`)
+  const subLine = subParts.join(' · ')
+
+  const dataCell = (label: string, value: string | number, anchor?: string, variant?: 'is-fail' | 'is-mono') => {
+    const inner = `
+      <div class="cover-data__label">${esc(label)}</div>
+      <div class="cover-data__num ${variant ?? ''}">${esc(value)}</div>`
+    return anchor
+      ? `<a class="cover-data__cell cover-data__cell--link" href="#${anchor}">${inner}<span class="cover-data__arrow">→</span></a>`
+      : `<div class="cover-data__cell">${inner}</div>`
+  }
+
   return `
 <section class="page page--cover">
   <div class="cover-stripe"></div>
-  <header class="cover-header">
+
+  <header class="cover-masthead">
     <span class="eyebrow">${esc(L.docKind)}</span>
     <span class="eyebrow eyebrow--meta">${headerMeta}</span>
   </header>
@@ -226,24 +191,25 @@ function renderCover(view: View): string {
     <p class="cover-title__lede">${esc(L.intro)}</p>
   </div>
 
-  <div class="cover-grid">
-    <div class="card gauge-card">
-      <div class="gauge-card__head">
-        <span class="eyebrow">${esc(L.passRate)}</span>
-      </div>
-      ${gauge(view)}
+  <div class="cover-hero">
+    <div class="cover-hero__label">${esc(L.passRate)}</div>
+    <div class="cover-hero__num ${hasFailures ? 'is-fail' : ''}">
+      <span>${pct.toFixed(1)}</span><span class="cover-hero__pct">%</span>
     </div>
-    <div class="kpi-grid">
-      ${totalCard}
-      ${passedCard}
-      ${failedCard}
-      ${skippedCard}
-      ${todoCard}
-      ${durationCard}
+    <div class="cover-hero__bar">
+      <div class="cover-hero__bar-fill ${hasFailures ? 'is-fail' : ''}" style="width:${pct.toFixed(2)}%"></div>
     </div>
+    <div class="cover-hero__sub">${esc(subLine)}</div>
   </div>
 
-  ${failurePreview}
+  <div class="cover-data">
+    ${dataCell(L.total, summary.total, hasToc ? TOC_ANCHOR : undefined)}
+    ${dataCell(L.passed, summary.passed)}
+    ${dataCell(L.failed, summary.failed, hasFailures ? FAILURES_ANCHOR : undefined, 'is-fail')}
+    ${dataCell(L.skipped, summary.skipped)}
+    ${dataCell(L.todo, summary.todo)}
+    ${dataCell(L.duration, fmtDuration(summary.durationMs), undefined, 'is-mono')}
+  </div>
 </section>`
 }
 
@@ -270,7 +236,7 @@ function failureRow(f: ViewFailure): string {
 }
 
 function renderFailuresIndex(view: View): string {
-  if (view.failures.length <= 5) return ''
+  if (view.failures.length === 0) return ''
   return `
 <section id="${FAILURES_ANCHOR}" class="page page--failures">
   <div class="page-header">
@@ -552,18 +518,11 @@ a { color: inherit; text-decoration: none; }
   background: hsl(var(--background));
   border-color: hsl(var(--border-strong));
   color: hsl(var(--foreground));
-}
-/* Tinted outline variants — same outline pattern, with the text + border
- * tinted by intent. Used to differentiate priority levels without a fill. */
-.badge--outline-destructive {
-  background: hsl(var(--background));
-  border-color: hsl(var(--destructive) / 0.4);
-  color: hsl(var(--destructive));
-}
-.badge--outline-warning {
-  background: hsl(var(--background));
-  border-color: hsl(var(--warning) / 0.4);
-  color: hsl(var(--warning));
+  /* Outline = informational chip. shadcn keeps it semibold like the rest
+   * of the badge variants, but for the metadata chips on test rows the
+   * content (REQ ID, category, priority) is not emphasis-worthy, so a
+   * medium weight reads as a quieter tag. */
+  font-weight: 500;
 }
 
 /* Status pill — same base sizing as any other badge. Width comes from
@@ -634,25 +593,25 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────── *
- *  COVER                                                                       *
+ *  COVER — masthead / hero / data strip (no cards)                            *
  * ────────────────────────────────────────────────────────────────────────── */
 
 .page--cover {
   position: relative;
-  padding: 20mm 16mm 16mm 16mm;
-  display: flex;
-  flex-direction: column;
-  gap: 6mm;
+  padding: 24mm 18mm 22mm 18mm;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  row-gap: 10mm;
   min-height: 297mm;
 }
 .cover-stripe {
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 4mm;
+  height: 2.4mm;
   background: hsl(var(--foreground));
 }
 
-.cover-header {
+.cover-masthead {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -660,137 +619,120 @@ a { color: inherit; text-decoration: none; }
   border-bottom: 1px solid hsl(var(--border));
 }
 
-.cover-title { margin-top: 0; }
+.cover-title { }
 .cover-title__h1 {
-  font-size: 30pt;
+  font-size: 34pt;
   font-weight: 800;
   letter-spacing: -0.028em;
   line-height: 1.02;
-  margin: 0 0 2mm 0;
+  margin: 0 0 3mm 0;
   color: hsl(var(--foreground));
-  max-width: 160mm;
+  max-width: 170mm;
 }
 .cover-title__lede {
-  font-size: 9.4pt;
+  font-size: 10pt;
   color: hsl(var(--muted-foreground));
   margin: 0;
   max-width: 130mm;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
-.cover-grid {
-  display: grid;
-  grid-template-columns: 84mm 1fr;
-  gap: 4mm;
-  align-items: stretch;
+/* HERO — fills the middle, vertically centered */
+.cover-hero {
+  align-self: center;
+  width: 100%;
 }
-
-/* Gauge card */
-.gauge-card {
-  padding: 6mm;
-  display: flex;
-  flex-direction: column;
-  gap: 4mm;
+.cover-hero__label {
+  font-size: 8pt;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  font-weight: 600;
+  margin-bottom: 3mm;
 }
-.gauge-card__head { display: flex; justify-content: space-between; }
-.gauge {
-  position: relative;
-  width: 62mm;
-  height: 62mm;
-  margin: auto;
-}
-.gauge svg { width: 100%; height: 100%; display: block; }
-.gauge__track { stroke: hsl(var(--muted)); }
-.gauge__fill--success { stroke: hsl(var(--success)); }
-.gauge__fill--destructive { stroke: hsl(var(--destructive)); }
-.gauge__fill--muted { stroke: hsl(var(--muted-foreground)); }
-.gauge__center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-.gauge__num {
-  font-size: 26pt;
+.cover-hero__num {
+  font-size: 88pt;
   font-weight: 800;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.04em;
   line-height: 1;
   color: hsl(var(--foreground));
   display: flex;
   align-items: baseline;
   font-feature-settings: "tnum" 1;
 }
-.gauge__pct {
-  font-size: 12pt;
+.cover-hero__num.is-fail { color: hsl(var(--destructive)); }
+.cover-hero__pct {
+  font-size: 36pt;
   color: hsl(var(--muted-foreground));
-  margin-left: 1.4mm;
-  font-weight: 600;
+  margin-left: 2.6mm;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
-.gauge__sub {
-  margin-top: 1.5mm;
-  font-size: 8pt;
+.cover-hero__bar {
+  width: 100%;
+  height: 1.6mm;
+  background: hsl(var(--muted));
+  margin-top: 5mm;
+  overflow: hidden;
+  border-radius: 999px;
+}
+.cover-hero__bar-fill {
+  height: 100%;
+  background: hsl(var(--foreground));
+  border-radius: 999px;
+}
+.cover-hero__bar-fill.is-fail { background: hsl(var(--destructive)); }
+.cover-hero__sub {
+  font-size: 9.4pt;
   color: hsl(var(--muted-foreground));
-  letter-spacing: 0.04em;
+  margin-top: 3mm;
+  letter-spacing: 0.01em;
 }
 
-/* KPI grid: 3 columns × 2 rows */
-.kpi-grid {
+/* DATA STRIP — table-like, no cards */
+.cover-data {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-auto-rows: 1fr;
-  gap: 3mm;
+  grid-template-columns: repeat(6, 1fr);
+  border-top: 1px solid hsl(var(--foreground));
+  border-bottom: 1px solid hsl(var(--border));
 }
-.kpi {
+.cover-data__cell {
   position: relative;
-  padding: 0;
+  padding: 4mm 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6mm;
+  border-right: 1px solid hsl(var(--border));
+  color: inherit;
 }
-.kpi__inner { padding: 3mm 4mm; display: flex; flex-direction: column; gap: 1mm; height: 100%; }
-.kpi__label {
+.cover-data__cell:last-child { border-right: none; }
+.cover-data__cell--link { /* same layout, just clickable */ }
+.cover-data__label {
   font-size: 7pt;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: hsl(var(--muted-foreground));
   font-weight: 600;
+  padding-left: 3mm;
 }
-.kpi__num {
+.cover-data__num {
   font-size: 22pt;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.025em;
   line-height: 1;
   color: hsl(var(--foreground));
   font-feature-settings: "tnum" 1;
+  padding-left: 3mm;
 }
-.kpi__num.is-pass { color: hsl(var(--success)); }
-.kpi__num.is-fail { color: hsl(var(--destructive)); }
-.kpi__num.is-skip { color: hsl(var(--muted-foreground)); }
-.kpi__num.is-todo { color: hsl(var(--warning)); }
-.kpi__num.is-mono {
-  font-size: 18pt;
-}
-.kpi__sub {
-  font-size: 7pt;
-  color: hsl(var(--muted-foreground));
-  margin-top: auto;
-}
-.kpi--pass { border-color: hsl(var(--success) / 0.35); }
-.kpi--fail { border-color: hsl(var(--destructive) / 0.4); background: hsl(var(--destructive-soft)); }
-.kpi-link { display: block; color: inherit; height: 100%; }
-.kpi--clickable::after {
-  content: "→";
+.cover-data__num.is-fail { color: hsl(var(--destructive)); }
+.cover-data__num.is-mono { font-size: 17pt; }
+.cover-data__arrow {
   position: absolute;
-  top: 3.4mm;
-  right: 4mm;
+  top: 4mm;
+  right: 3mm;
   font-size: 9pt;
   color: hsl(var(--muted-foreground));
 }
-.kpi__inner .bar__fill { background: hsl(var(--foreground)); }
-.kpi--pass .bar__fill { background: hsl(var(--success)); }
-.kpi--fail .bar__fill { background: hsl(var(--destructive)); }
-.kpi .is-skip ~ .bar .bar__fill,
-.kpi .is-todo ~ .bar .bar__fill { background: hsl(var(--muted-foreground)); }
 
 /* ────────────────────────────────────────────────────────────────────────── *
  *  FAILURES CARD (cover preview + standalone page)                            *
@@ -861,6 +803,9 @@ a { color: inherit; text-decoration: none; }
  *  TABLE OF CONTENTS                                                          *
  * ────────────────────────────────────────────────────────────────────────── */
 
+/* TOC — every title starts at the same column (after the rail) regardless of
+ * depth. Numbers grow longer with depth but stay within the same rail width.
+ * Depth is communicated by color and weight, NOT indentation. */
 .toc {
   list-style: none;
   margin: 0;
@@ -876,21 +821,23 @@ a { color: inherit; text-decoration: none; }
   align-items: baseline;
   color: inherit;
 }
-.toc-row--d1 .toc-row__link { padding: 2.6mm 0; }
-.toc-row--d1 { border-bottom: 1px solid hsl(var(--border-strong)); }
-.toc-row--d1 .toc-row__num { font-weight: 700; color: hsl(var(--foreground)); font-size: 9.4pt; }
-.toc-row--d1 .toc-row__name { font-weight: 700; font-size: 11pt; letter-spacing: -0.01em; }
-.toc-row--d2 .toc-row__link { padding-left: 6mm; }
-.toc-row--d2 .toc-row__name { font-weight: 600; font-size: 9.6pt; }
-.toc-row--d3 .toc-row__link { padding-left: 12mm; }
-.toc-row--d3 .toc-row__name { color: hsl(var(--muted-foreground)); font-size: 9pt; }
-.toc-row--d4 .toc-row__link { padding-left: 18mm; }
-.toc-row--d4 .toc-row__name { color: hsl(var(--muted-foreground)); font-size: 8.6pt; }
 .toc-row__num {
-  font-size: 7.8pt;
+  font-size: 8pt;
   color: hsl(var(--muted-foreground));
   font-weight: 500;
 }
+.toc-row__name {
+  font-size: 9.4pt;
+  color: hsl(var(--foreground));
+  font-weight: 500;
+}
+.toc-row--d1 .toc-row__link { padding: 2.8mm 0; }
+.toc-row--d1 { border-bottom: 1px solid hsl(var(--border-strong)); }
+.toc-row--d1 .toc-row__num { font-weight: 700; color: hsl(var(--foreground)); font-size: 9pt; }
+.toc-row--d1 .toc-row__name { font-weight: 700; font-size: 11pt; letter-spacing: -0.01em; }
+.toc-row--d2 .toc-row__name { font-weight: 600; font-size: 9.6pt; }
+.toc-row--d3 .toc-row__name { font-weight: 400; font-size: 9.2pt; color: hsl(var(--muted-foreground)); }
+.toc-row--d4 .toc-row__name { font-weight: 400; font-size: 8.8pt; color: hsl(var(--muted-foreground)); }
 
 /* ────────────────────────────────────────────────────────────────────────── *
  *  SECTIONS                                                                    *
