@@ -84,9 +84,12 @@ describe('renderHtml', () => {
     expect(html).toContain('href="#failures"')
     // Cover stat "Total" tile links to the TOC anchor.
     expect(html).toContain('href="#toc"')
-    // Failures index links to the failing case anchor.
+    // Failures index links to the failing case's detail entry, not to its
+    // compact row, so the reader lands on the error + diff + stack trace.
     const failingCaseId = view.failures[0]!.caseId
-    expect(html).toContain(`href="#${failingCaseId}"`)
+    expect(html).toContain(`href="#detail-${failingCaseId}"`)
+    // The detail entry itself exists at that anchor.
+    expect(html).toContain(`id="detail-${failingCaseId}"`)
   })
 
   it('omits the failures index when there are no failures', () => {

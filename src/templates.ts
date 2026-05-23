@@ -35,12 +35,10 @@ function fmtDuration(ms: number): string {
 }
 
 function statusBadgeVariant(s: TestStatus): string {
-  switch (s) {
-    case 'pass': return 'badge--success'
-    case 'fail': return 'badge--destructive'
-    case 'skip': return 'badge--muted'
-    case 'todo': return 'badge--outline'
-  }
+  // Only FAIL gets a color treatment — it's the one outcome that demands
+  // the reader's attention. PASS / SKIP / TODO are neutral outline so the
+  // page reads in black and gray with red strictly reserved for signal.
+  return s === 'fail' ? 'badge--destructive' : 'badge--outline'
 }
 
 function statusLabel(s: TestStatus): string {
@@ -197,7 +195,7 @@ function renderCover(view: View): string {
       <span>${pct.toFixed(1)}</span><span class="cover-hero__pct">%</span>
     </div>
     <div class="cover-hero__bar">
-      <div class="cover-hero__bar-fill ${hasFailures ? 'is-fail' : ''}" style="width:${pct.toFixed(2)}%"></div>
+      <div class="cover-hero__bar-fill" style="width:${pct.toFixed(2)}%"></div>
     </div>
     <div class="cover-hero__sub">${esc(subLine)}</div>
   </div>
@@ -220,11 +218,11 @@ function renderCover(view: View): string {
 function failureRow(f: ViewFailure): string {
   return `
   <li class="failure-row">
-    <a class="failure-row__link" href="#${esc(f.caseId)}">
+    <a class="failure-row__link" href="#detail-${esc(f.caseId)}">
       ${statusBadge('fail')}
       <div class="failure-row__body">
         <div class="failure-row__top">
-          <span class="failure-row__num mono">${esc(f.sectionNumber)}</span>
+          <span class="failure-row__num">${esc(f.sectionNumber)}</span>
           <span class="failure-row__name">${esc(f.name)}</span>
           ${f.requirementId ? `<span class="badge badge--outline mono failure-row__req">${esc(f.requirementId)}</span>` : `<span></span>`}
           <span class="failure-row__arrow">→</span>
@@ -263,7 +261,7 @@ function renderToc(view: View): string {
       (e) => `
     <li class="toc-row toc-row--d${Math.min(e.depth, 4)}">
       <a class="toc-row__link" href="#${esc(e.id)}">
-        <span class="toc-row__num mono">${esc(e.number)}</span>
+        <span class="toc-row__num">${esc(e.number)}</span>
         <span class="toc-row__name">${esc(e.name)}</span>
       </a>
     </li>`,
@@ -324,34 +322,111 @@ function renderError(c: ViewCase, includeStack: boolean): string {
     </div>`
 }
 
-function renderCase(c: ViewCase, opts: ResolvedPdfReporterOptions): string {
-  const desc = c.meta.description
-    ? `<p class="case__desc">${esc(String(c.meta.description))}</p>`
-    : ''
+function caseHasDetail(c: ViewCase): boolean {
+  return c.status === 'fail'
+    || (typeof c.meta.description === 'string' && c.meta.description.length > 0)
+    || (typeof c.meta.precondition === 'string' && c.meta.precondition.length > 0)
+    || (typeof c.meta.note === 'string' && c.meta.note.length > 0)
+    || (typeof c.meta.screenshot === 'string' && c.meta.screenshot.length > 0)
+}
 
-  const kvs: string[] = []
-  if (c.meta.precondition) {
-    kvs.push(`<div class="case__kv"><dt>${esc(L.metaPrecondition)}</dt><dd>${esc(String(c.meta.precondition))}</dd></div>`)
-  }
-  if (c.meta.note) {
-    kvs.push(`<div class="case__kv"><dt>${esc(L.metaNote)}</dt><dd>${esc(String(c.meta.note))}</dd></div>`)
-  }
-  const kvBlock = kvs.length > 0 ? `<dl class="case__kvs">${kvs.join('')}</dl>` : ''
-
+/**
+ * Compact case row. One line for the name + duration; if any chips
+ * (REQ ID, category, priority) are present they wrap to a second
+ * line below. Description, precondition, note, error and screenshot
+ * are intentionally NOT rendered here — they belong in the Details
+ * section.
+ */
+function renderCase(c: ViewCase, _opts: ResolvedPdfReporterOptions): string {
+  const arrow = caseHasDetail(c)
+    ? `<a class="case__arrow" href="#detail-${esc(c.id)}" aria-label="open details">→</a>`
+    : '<span class="case__arrow case__arrow--placeholder" aria-hidden="true"></span>'
   return `
   <li class="case is-${c.status}" id="${esc(c.id)}">
     <div class="case__rail">${statusBadge(c.status)}</div>
     <div class="case__body">
-      <div class="case__top">
+      <div class="case__row">
         <h4 class="case__name">${esc(c.name)}</h4>
         <span class="case__duration">${fmtDuration(c.durationMs)}</span>
+        ${arrow}
       </div>
       ${chips(c.meta)}
-      ${desc}
-      ${kvBlock}
-      ${renderError(c, opts.includeStackTrace)}
     </div>
   </li>`
+}
+
+function renderScreenshot(src: string): string {
+  // The src is passed through verbatim. Authors should provide a data: URL
+  // or an absolute http(s):// / file:// URL — local relative paths won't
+  // resolve through Playwright's `page.setContent` without a baseURL.
+  return `
+    <figure class="evidence">
+      <img class="evidence__img" src="${esc(src)}" alt="Evidence screenshot" />
+      <figcaption class="evidence__caption">Evidence</figcaption>
+    </figure>`
+}
+
+function renderDetailEntry(c: ViewCase, sectionNumber: string, sectionPath: string, opts: ResolvedPdfReporterOptions): string {
+  const kvs: string[] = []
+  if (c.meta.description) {
+    kvs.push(`<div class="detail__kv"><dt>Description</dt><dd>${esc(String(c.meta.description))}</dd></div>`)
+  }
+  if (c.meta.precondition) {
+    kvs.push(`<div class="detail__kv"><dt>${esc(L.metaPrecondition)}</dt><dd>${esc(String(c.meta.precondition))}</dd></div>`)
+  }
+  if (c.meta.note) {
+    kvs.push(`<div class="detail__kv"><dt>${esc(L.metaNote)}</dt><dd>${esc(String(c.meta.note))}</dd></div>`)
+  }
+  const kvBlock = kvs.length > 0 ? `<dl class="detail__kvs">${kvs.join('')}</dl>` : ''
+  const screenshot = typeof c.meta.screenshot === 'string' && c.meta.screenshot.length > 0
+    ? renderScreenshot(c.meta.screenshot)
+    : ''
+  const error = renderError(c, opts.includeStackTrace)
+  return `
+  <article class="detail" id="detail-${esc(c.id)}">
+    <header class="detail__head">
+      <div class="detail__head-left">
+        ${statusBadge(c.status)}
+        <span class="detail__num">${esc(sectionNumber)}</span>
+      </div>
+      <h3 class="detail__name">${esc(c.name)}</h3>
+      <span class="detail__duration">${fmtDuration(c.durationMs)}</span>
+    </header>
+    <div class="detail__path">${esc(sectionPath)}</div>
+    ${chips(c.meta)}
+    ${kvBlock}
+    ${error}
+    ${screenshot}
+  </article>`
+}
+
+function renderDetailsSection(view: View, opts: ResolvedPdfReporterOptions): string {
+  type Item = { case: ViewCase; sectionNumber: string; sectionPath: string }
+  const items: Item[] = []
+  const walk = (s: ViewSection, path: string[]) => {
+    const next = [...path, s.name]
+    for (const c of s.cases) {
+      if (caseHasDetail(c)) {
+        items.push({ case: c, sectionNumber: s.number, sectionPath: next.join(' › ') })
+      }
+    }
+    s.children.forEach((child) => walk(child, next))
+  }
+  view.sections.forEach((s) => walk(s, []))
+  if (items.length === 0) return ''
+
+  const entries = items
+    .map((it) => renderDetailEntry(it.case, it.sectionNumber, it.sectionPath, opts))
+    .join('')
+  return `
+<section class="page page--details" id="details">
+  <div class="page-header">
+    <span class="eyebrow">Details</span>
+    <h2 class="page-header__h2">Details</h2>
+    <p class="page-header__lede">Failures, evidence, and per-test detail.</p>
+  </div>
+  <div class="details">${entries}</div>
+</section>`
 }
 
 function renderSection(s: ViewSection, opts: ResolvedPdfReporterOptions): string {
@@ -367,7 +442,7 @@ function renderSection(s: ViewSection, opts: ResolvedPdfReporterOptions): string
   return `
 <section id="${esc(s.id)}" class="${sectionCls}">
   <header class="section__head">
-    <span class="section__num mono">${esc(s.number)}</span>
+    <span class="section__num">${esc(s.number)}</span>
     <${headingTag} class="section__title">${esc(s.name)}</${headingTag}>
   </header>
   ${subtitle}
@@ -474,63 +549,59 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--radius);
 }
 
-/* Badge — shadcn's stock styling. Default radius is rounded-md
- * (calc(var(--radius) - 2px)), padding mirrors px-2.5 py-0.5 from
- * shadcn (~2.4mm horizontal / ~0.6mm vertical at print). line-height
- * 1 keeps text vertically centered. */
+/* Badge — every variant is outline-only. There are no filled badges
+ * anywhere in this document. Variants differentiate via border + text +
+ * icon color, never via fill. Geometry (padding, font-size, border-
+ * radius, weight) is identical across all variants. */
 .badge {
   display: inline-flex;
   align-items: center;
-  border-radius: calc(var(--radius) - 2px);
-  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid hsl(var(--border-strong));
+  color: hsl(var(--foreground));
   padding: 0.6mm 2.4mm;
   font-size: 7pt;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
   white-space: nowrap;
   font-feature-settings: "tnum" 1;
 }
-.badge--default {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-.badge--secondary {
-  background: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
+.badge--outline {
+  /* Default border + foreground text — the "neutral" variant. */
 }
 .badge--destructive {
-  background: hsl(var(--destructive));
-  color: hsl(var(--destructive-foreground));
+  border-color: hsl(var(--destructive) / 0.6);
+  color: hsl(var(--destructive));
 }
 .badge--success {
-  background: hsl(var(--success));
-  color: hsl(var(--success-foreground));
+  border-color: hsl(var(--success) / 0.6);
+  color: hsl(var(--success));
 }
 .badge--warning {
-  background: hsl(var(--warning));
-  color: hsl(var(--warning-foreground));
+  border-color: hsl(var(--warning) / 0.6);
+  color: hsl(var(--warning));
 }
 .badge--muted {
-  background: hsl(var(--muted));
+  border-color: hsl(var(--border-strong));
   color: hsl(var(--muted-foreground));
 }
-.badge--outline {
-  background: hsl(var(--background));
+.badge--secondary {
   border-color: hsl(var(--border-strong));
   color: hsl(var(--foreground));
-  /* Outline = informational chip. shadcn keeps it semibold like the rest
-   * of the badge variants, but for the metadata chips on test rows the
-   * content (REQ ID, category, priority) is not emphasis-worthy, so a
-   * medium weight reads as a quieter tag. */
-  font-weight: 500;
+}
+.badge--default {
+  border-color: hsl(var(--foreground));
+  color: hsl(var(--foreground));
 }
 
-/* Status pill — same base sizing as any other badge. Width comes from
- * the content (PASS / FAIL / SKIP / TODO are all 4 chars, so they
- * align naturally). The pill shape is the only deviation. */
+/* Status pill — outline like every other badge, just rounded fully and a
+ * touch heavier so it reads as functional emphasis (the test outcome
+ * matters; metadata chips do not). */
 .badge--status {
   gap: 1mm;
   border-radius: 999px;
+  font-weight: 600;
 }
 .badge__icon {
   width: 2.8mm;
@@ -681,7 +752,6 @@ a { color: inherit; text-decoration: none; }
   background: hsl(var(--foreground));
   border-radius: 999px;
 }
-.cover-hero__bar-fill.is-fail { background: hsl(var(--destructive)); }
 .cover-hero__sub {
   font-size: 9.4pt;
   color: hsl(var(--muted-foreground));
@@ -918,68 +988,143 @@ a { color: inherit; text-decoration: none; }
   grid-template-columns: var(--rail-w) 1fr;
   gap: var(--rail-gap);
   align-items: start;
-  padding: 1.8mm 0;
+  padding: 1.6mm 0;
   border-bottom: 1px solid hsl(var(--border));
   break-inside: avoid;
   page-break-inside: avoid;
 }
 .case:last-child { border-bottom: none; }
-.case__rail { padding-top: 0.4mm; }
+.case__rail { padding-top: 0.2mm; }
 
 .case__body { display: flex; flex-direction: column; gap: 1mm; min-width: 0; }
-.case__top {
+.case__row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto 5mm;
   gap: 4mm;
   align-items: baseline;
 }
 .case__name {
   margin: 0;
-  font-size: 10pt;
-  font-weight: 700;
+  font-size: 9.4pt;
+  font-weight: 500;
   letter-spacing: -0.005em;
   color: hsl(var(--foreground));
-  line-height: 1.25;
+  line-height: 1.3;
 }
 .case.is-fail .case__name { color: hsl(var(--destructive)); }
-.case.is-skip .case__name { color: hsl(var(--muted-foreground)); font-weight: 500; }
+.case.is-skip .case__name,
+.case.is-todo .case__name { color: hsl(var(--muted-foreground)); }
 .case__duration {
   font-size: 7.6pt;
   color: hsl(var(--muted-foreground));
   white-space: nowrap;
   font-feature-settings: "tnum" 1;
 }
-
+.case__arrow {
+  text-align: right;
+  font-size: 9pt;
+  color: hsl(var(--muted-foreground));
+  line-height: 1;
+}
+.case__arrow--placeholder { color: transparent; }
 .case__chips { display: flex; flex-wrap: wrap; gap: 1mm; }
 
-.case__desc {
-  margin: 0;
-  font-size: 8.6pt;
-  color: hsl(var(--muted-foreground));
-  line-height: 1.4;
-  max-width: 150mm;
-}
+/* ────────────────────────────────────────────────────────────────────────── *
+ *  DETAILS — failure errors, evidence and per-test detail                     *
+ * ────────────────────────────────────────────────────────────────────────── */
 
-.case__kvs { margin: 0; display: flex; flex-direction: column; gap: 0.4mm; }
-.case__kv {
+.page--details {
+  break-before: page;
+  page-break-before: always;
+  padding-top: 2mm;
+}
+.details { display: flex; flex-direction: column; gap: 6mm; }
+.detail {
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 4mm 5mm;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.detail__head {
   display: grid;
-  grid-template-columns: 22mm 1fr;
+  grid-template-columns: auto 1fr auto;
+  gap: 4mm;
+  align-items: baseline;
+}
+.detail__head-left {
+  display: flex;
   gap: 3mm;
   align-items: baseline;
-  font-size: 8.4pt;
-  margin: 0;
-  line-height: 1.35;
 }
-.case__kv dt {
+.detail__num {
+  font-size: 9pt;
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+}
+.detail__name {
+  margin: 0;
+  font-size: 11.5pt;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: hsl(var(--foreground));
+  line-height: 1.25;
+}
+.detail.is-fail .detail__name { color: hsl(var(--destructive)); }
+.detail__duration {
+  font-size: 8pt;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+.detail__path {
+  font-size: 7.6pt;
+  color: hsl(var(--muted-foreground));
+}
+.detail__kvs { margin: 0; display: flex; flex-direction: column; gap: 0.8mm; }
+.detail__kv {
+  display: grid;
+  grid-template-columns: 26mm 1fr;
+  gap: 4mm;
+  align-items: baseline;
+  font-size: 8.6pt;
+  margin: 0;
+  line-height: 1.4;
+}
+.detail__kv dt {
   font-size: 7.8pt;
   color: hsl(var(--muted-foreground));
   font-weight: 500;
   margin: 0;
 }
-.case__kv dd { margin: 0; color: hsl(var(--foreground)); }
+.detail__kv dd { margin: 0; color: hsl(var(--foreground)); }
+
+.evidence {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4mm;
+}
+.evidence__img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  display: block;
+}
+.evidence__caption {
+  font-size: 7.4pt;
+  color: hsl(var(--muted-foreground));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
 
 /* ────────────────────────────────────────────────────────────────────────── *
- *  ERROR (shadcn Alert variant: destructive)                                  *
+ *  ERROR (shadcn Alert variant: destructive — outline only)                  *
  * ────────────────────────────────────────────────────────────────────────── */
 
 .error {
@@ -1050,6 +1195,7 @@ export function renderHtml({ view, options }: RenderHtmlInput): string {
   const failures = renderFailuresIndex(view)
   const toc = options.includeTableOfContents ? renderToc(view) : ''
   const body = view.sections.map((s) => renderSection(s, options)).join('')
+  const details = renderDetailsSection(view, options)
   const customCss = options.customCss ? `\n/* customCss */\n${options.customCss}` : ''
 
   return `<!doctype html>
@@ -1064,6 +1210,7 @@ ${cover}
 ${failures}
 ${toc}
 <main class="doc">${body}</main>
+${details}
 </body>
 </html>`
 }
