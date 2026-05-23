@@ -91,14 +91,12 @@ const L = {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Lucide `BadgeCheck` / `BadgeX` / `BadgeMinus` / `BadgeQuestionMark`
- * icons rendered in filled style: the badge petal shape is painted with
- * `currentColor` (the accent color set by the parent variant) and the
- * inner symbol is stroked in white, producing the "white symbol carved
- * out of an accent-colored badge" look that shadcn uses on status chips.
+ * Lucide `CircleCheck` / `CircleX` / `CircleMinus` / `CircleQuestionMark` /
+ * `CircleAlert` rendered in filled style: a solid circle painted with
+ * `currentColor` (the accent set by the parent variant) and the inner
+ * symbol stroked in white on top.
  */
-const BADGE_SHAPE =
-  '<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" fill="currentColor" stroke="none"/>'
+const CIRCLE = '<circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/>'
 
 function wrapIcon(children: string): string {
   return `<svg class="badge__icon" viewBox="0 0 24 24" aria-hidden="true">${children}</svg>`
@@ -116,14 +114,14 @@ function whiteStrokes(paths: string[]): string {
 function statusIcon(s: TestStatus): string {
   switch (s) {
     case 'pass':
-      return wrapIcon(BADGE_SHAPE + whiteStrokes(['m9 12 2 2 4-4']))
+      return wrapIcon(CIRCLE + whiteStrokes(['m9 12 2 2 4-4']))
     case 'fail':
-      return wrapIcon(BADGE_SHAPE + whiteStrokes(['m15 9-6 6', 'm9 9 6 6']))
+      return wrapIcon(CIRCLE + whiteStrokes(['m15 9-6 6', 'm9 9 6 6']))
     case 'skip':
-      return wrapIcon(BADGE_SHAPE + whiteStrokes(['M8 12h8']))
+      return wrapIcon(CIRCLE + whiteStrokes(['M8 12h8']))
     case 'todo':
       return wrapIcon(
-        BADGE_SHAPE +
+        CIRCLE +
           whiteStrokes(['M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3']) +
           '<circle cx="12" cy="17" r="0.9" fill="white"/>',
       )
@@ -132,7 +130,7 @@ function statusIcon(s: TestStatus): string {
 
 function errorIcon(): string {
   return wrapIcon(
-    BADGE_SHAPE +
+    CIRCLE +
       whiteStrokes(['M12 8v4']) +
       '<circle cx="12" cy="16" r="0.9" fill="white"/>',
   )
