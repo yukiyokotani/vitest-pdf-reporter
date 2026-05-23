@@ -75,13 +75,16 @@ export interface SpecDocument {
 
 /**
  * User-facing configuration for the reporter.
+ *
+ * Labels (Pass Rate, Failed, Contents, etc.) are not configurable — they are
+ * fixed English strings. Everything that's specific to a particular project
+ * (title, project name, version, output path, etc.) is.
  */
 export interface PdfReporterOptions {
   outputFile?: string
   title?: string
   projectName?: string
   version?: string
-  locale?: 'ja' | 'en'
   paperSize?: 'A4' | 'Letter'
   orientation?: 'portrait' | 'landscape'
   includeCoverPage?: boolean

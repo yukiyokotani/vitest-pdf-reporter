@@ -7,7 +7,6 @@ import type { PdfReporterOptions, ResolvedPdfReporterOptions } from './types'
 const DEFAULTS = {
   outputFile: './test-report.pdf',
   title: 'Test Specification',
-  locale: 'en' as const,
   paperSize: 'A4' as const,
   orientation: 'portrait' as const,
   includeCoverPage: true,
@@ -20,7 +19,6 @@ export function resolveOptions(opts: PdfReporterOptions = {}): ResolvedPdfReport
   const resolved: ResolvedPdfReporterOptions = {
     outputFile: opts.outputFile ?? DEFAULTS.outputFile,
     title: opts.title ?? DEFAULTS.title,
-    locale: opts.locale ?? DEFAULTS.locale,
     paperSize: opts.paperSize ?? DEFAULTS.paperSize,
     orientation: opts.orientation ?? DEFAULTS.orientation,
     includeCoverPage: opts.includeCoverPage ?? DEFAULTS.includeCoverPage,

@@ -24,18 +24,11 @@ function esc(s: string | number | undefined | null): string {
 /*  Formatters                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function fmtDate(d: Date, locale: 'ja' | 'en'): string {
-  try {
-    return new Intl.DateTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(d)
-  } catch {
-    return d.toISOString()
-  }
+function fmtDate(d: Date): string {
+  // Stable ISO-style format. Avoids Intl locale quirks across CI / OS combos
+  // and keeps the cover header looking the same everywhere.
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 function fmtDuration(ms: number): string {
@@ -43,8 +36,7 @@ function fmtDuration(ms: number): string {
   return `${Math.round(ms)}ms`
 }
 
-function statusLabel(s: TestStatus, locale: 'ja' | 'en'): string {
-  if (locale === 'ja') return ({ pass: '合格', fail: '不合格', skip: 'スキップ', todo: '未着手' } as const)[s]
+function statusLabel(s: TestStatus): string {
   return ({ pass: 'PASS', fail: 'FAIL', skip: 'SKIP', todo: 'TODO' } as const)[s]
 }
 
@@ -61,99 +53,34 @@ function priorityVariant(priority: string | undefined): string {
 /*  Strings                                                                    */
 /* -------------------------------------------------------------------------- */
 
-type Strings = {
-  docKind: string
-  summary: string
-  passRate: string
-  total: string
-  passed: string
-  failed: string
-  skipped: string
-  todo: string
-  duration: string
-  files: string
-  contents: string
-  generated: string
-  project: string
-  version: string
-  metaReq: string
-  metaCategory: string
-  metaPriority: string
-  metaPrecondition: string
-  metaNote: string
-  error: string
-  stack: string
-  diff: string
-  failures: string
-  failuresLede: string
-  failuresEmpty: string
-  showAll: string
-  intro: string
-  locale: string
-}
-
-const TXT: { ja: Strings; en: Strings } = {
-  ja: {
-    docKind: 'TEST SPECIFICATION',
-    summary: 'SUMMARY',
-    passRate: '合格率',
-    total: '総数',
-    passed: '合格',
-    failed: '不合格',
-    skipped: 'スキップ',
-    todo: '未着手',
-    duration: '実行時間',
-    files: 'ファイル',
-    contents: '目次',
-    generated: '生成',
-    project: 'プロジェクト',
-    version: 'バージョン',
-    metaReq: '要件ID',
-    metaCategory: 'カテゴリ',
-    metaPriority: '優先度',
-    metaPrecondition: '前提条件',
-    metaNote: '備考',
-    error: 'エラー詳細',
-    stack: 'スタックトレース',
-    diff: '差分',
-    failures: '失敗テスト',
-    failuresLede: '不合格となったテストの一覧です。各行をクリックして詳細へ移動できます。',
-    failuresEmpty: '失敗したテストはありません。',
-    showAll: '全て見る',
-    intro: 'テストコードから自動生成された仕様書です。',
-    locale: 'ja-JP',
-  },
-  en: {
-    docKind: 'TEST SPECIFICATION',
-    summary: 'SUMMARY',
-    passRate: 'Pass Rate',
-    total: 'Total',
-    passed: 'Passed',
-    failed: 'Failed',
-    skipped: 'Skipped',
-    todo: 'Todo',
-    duration: 'Duration',
-    files: 'Files',
-    contents: 'Contents',
-    generated: 'Generated',
-    project: 'Project',
-    version: 'Version',
-    metaReq: 'Req ID',
-    metaCategory: 'Category',
-    metaPriority: 'Priority',
-    metaPrecondition: 'Precondition',
-    metaNote: 'Note',
-    error: 'Error',
-    stack: 'Stack trace',
-    diff: 'Diff',
-    failures: 'Failures',
-    failuresLede: 'Tests that did not pass. Click any row to jump to the detail.',
-    failuresEmpty: 'No failing tests.',
-    showAll: 'View all',
-    intro: 'Auto-generated specification from your test suite.',
-    locale: 'en-US',
-  },
-}
+// Fixed English labels. Content (titles, test names, metadata) flows
+// through from the user's tests verbatim and supports any language —
+// only the structural labels are locked to English.
+const L = {
+  docKind: 'TEST SPECIFICATION',
+  passRate: 'Pass Rate',
+  total: 'Total',
+  passed: 'Passed',
+  failed: 'Failed',
+  skipped: 'Skipped',
+  todo: 'Todo',
+  duration: 'Duration',
+  files: 'Files',
+  contents: 'Contents',
+  generated: 'Generated',
+  metaReq: 'Req ID',
+  metaCategory: 'Category',
+  metaPriority: 'Priority',
+  metaPrecondition: 'Precondition',
+  metaNote: 'Note',
+  error: 'Error',
+  stack: 'Stack trace',
+  diff: 'Diff',
+  failures: 'Failures',
+  failuresLede: 'Tests that did not pass. Click any row to jump to the detail.',
+  showAll: 'View all',
+  intro: 'Auto-generated specification from your test suite.',
+} as const
 
 /* -------------------------------------------------------------------------- */
 /*  SVG donut gauge                                                            */
@@ -196,7 +123,7 @@ function gauge(view: View): string {
 /*  Cover                                                                      */
 /* -------------------------------------------------------------------------- */
 
-function renderCover(view: View, t: Strings): string {
+function renderCover(view: View): string {
   const { summary } = view
   const hasFailures = summary.failed > 0
   const hasToc = view.options.includeTableOfContents && view.toc.length > 0
@@ -205,9 +132,9 @@ function renderCover(view: View, t: Strings): string {
     `<a class="kpi-link ${cls}" href="#${target}">${body}</a>`
 
   const totalInner = `
-      <div class="kpi__label">${esc(t.total)}</div>
+      <div class="kpi__label">${esc(L.total)}</div>
       <div class="kpi__num">${summary.total}</div>
-      <div class="kpi__caption">${summary.fileCount} ${esc(t.files.toLowerCase())}</div>`
+      <div class="kpi__caption">${summary.fileCount} ${esc(L.files.toLowerCase())}</div>`
   const totalCard = hasToc
     ? `<div class="card kpi kpi--clickable">${link(TOC_ANCHOR, totalInner)}</div>`
     : `<div class="card kpi">${totalInner}</div>`
@@ -215,7 +142,7 @@ function renderCover(view: View, t: Strings): string {
   const passedCard = `
     <div class="card kpi">
       <div class="kpi__label">
-        <span class="dot dot--success"></span>${esc(t.passed)}
+        <span class="dot dot--success"></span>${esc(L.passed)}
       </div>
       <div class="kpi__num">${summary.passed}</div>
       <div class="bar"><div class="bar__fill bar__fill--success" style="width:${pctOf(summary.passed, summary.total)}%"></div></div>
@@ -223,7 +150,7 @@ function renderCover(view: View, t: Strings): string {
 
   const failedInner = `
       <div class="kpi__label">
-        <span class="dot dot--destructive"></span>${esc(t.failed)}
+        <span class="dot dot--destructive"></span>${esc(L.failed)}
       </div>
       <div class="kpi__num kpi__num--destructive">${summary.failed}</div>
       <div class="bar"><div class="bar__fill bar__fill--destructive" style="width:${pctOf(summary.failed, summary.total)}%"></div></div>`
@@ -234,7 +161,7 @@ function renderCover(view: View, t: Strings): string {
   const skippedCard = `
     <div class="card kpi">
       <div class="kpi__label">
-        <span class="dot dot--muted"></span>${esc(t.skipped)}
+        <span class="dot dot--muted"></span>${esc(L.skipped)}
       </div>
       <div class="kpi__num">${summary.skipped}</div>
       <div class="bar"><div class="bar__fill bar__fill--muted" style="width:${pctOf(summary.skipped, summary.total)}%"></div></div>
@@ -243,7 +170,7 @@ function renderCover(view: View, t: Strings): string {
   const todoCard = `
     <div class="card kpi">
       <div class="kpi__label">
-        <span class="dot dot--warning"></span>${esc(t.todo)}
+        <span class="dot dot--warning"></span>${esc(L.todo)}
       </div>
       <div class="kpi__num">${summary.todo}</div>
       <div class="bar"><div class="bar__fill bar__fill--warning" style="width:${pctOf(summary.todo, summary.total)}%"></div></div>
@@ -251,9 +178,9 @@ function renderCover(view: View, t: Strings): string {
 
   const durationCard = `
     <div class="card kpi">
-      <div class="kpi__label">${esc(t.duration)}</div>
+      <div class="kpi__label">${esc(L.duration)}</div>
       <div class="kpi__num kpi__num--mono">${fmtDuration(summary.durationMs)}</div>
-      <div class="kpi__caption">${esc(t.generated)} ${esc(fmtDate(view.generatedAt, view.options.locale))}</div>
+      <div class="kpi__caption">${esc(L.generated)} ${esc(fmtDate(view.generatedAt))}</div>
     </div>`
 
   // Inline failure preview (first 5). The KPI tile's `#failures` link lands
@@ -263,13 +190,13 @@ function renderCover(view: View, t: Strings): string {
   const inlineFailures = hasFailures && view.failures.length <= 5
   const previewId = inlineFailures ? FAILURES_ANCHOR : ''
   const previewMoreLink = !inlineFailures
-    ? `<a class="cover-failures__more" href="#${FAILURES_ANCHOR}">${esc(t.showAll)} →</a>`
+    ? `<a class="cover-failures__more" href="#${FAILURES_ANCHOR}">${esc(L.showAll)} →</a>`
     : ''
   const failurePreview = hasFailures
     ? `
     <section class="cover-failures"${previewId ? ` id="${previewId}"` : ''}>
       <div class="cover-failures__head">
-        <span class="eyebrow">${esc(t.failures)}</span>
+        <span class="eyebrow">${esc(L.failures)}</span>
         ${previewMoreLink}
       </div>
       <ol class="cover-failures__list">
@@ -282,7 +209,7 @@ function renderCover(view: View, t: Strings): string {
   const headerMeta = [
     view.projectName,
     view.version ? `v${view.version}` : null,
-    fmtDate(view.generatedAt, view.options.locale),
+    fmtDate(view.generatedAt),
   ]
     .filter(Boolean)
     .map((s) => esc(String(s)))
@@ -291,19 +218,19 @@ function renderCover(view: View, t: Strings): string {
   return `
 <section class="page page--cover">
   <header class="cover-header">
-    <span class="eyebrow">${esc(t.docKind)}</span>
+    <span class="eyebrow">${esc(L.docKind)}</span>
     <span class="eyebrow eyebrow--meta">${headerMeta}</span>
   </header>
 
   <div class="cover-title">
     <h1 class="cover-title__h1">${esc(view.title)}</h1>
-    <p class="cover-title__lede">${esc(t.intro)}</p>
+    <p class="cover-title__lede">${esc(L.intro)}</p>
   </div>
 
   <div class="cover-grid">
     <div class="card gauge-card">
       ${gauge(view)}
-      <div class="gauge-caption">${esc(t.passRate)}</div>
+      <div class="gauge-caption">${esc(L.passRate)}</div>
     </div>
     <div class="kpi-grid">
       ${totalCard}
@@ -344,16 +271,16 @@ function failureRow(f: ViewFailure, ctx: 'cover' | 'page'): string {
   </li>`
 }
 
-function renderFailuresIndex(view: View, t: Strings): string {
+function renderFailuresIndex(view: View): string {
   // Only emit the standalone page when the cover preview can't show every
   // failure (>5). Otherwise the cover preview owns the `failures` anchor.
   if (view.failures.length <= 5) return ''
   return `
 <section id="${FAILURES_ANCHOR}" class="page page--failures">
   <div class="page-header">
-    <span class="eyebrow">${esc(t.failures)}</span>
-    <h2 class="page-header__h2">${esc(t.failures)}</h2>
-    <p class="page-header__lede">${esc(t.failuresLede)}</p>
+    <span class="eyebrow">${esc(L.failures)}</span>
+    <h2 class="page-header__h2">${esc(L.failures)}</h2>
+    <p class="page-header__lede">${esc(L.failuresLede)}</p>
   </div>
   <ol class="failures-list">
     ${view.failures.map((f) => failureRow(f, 'page')).join('')}
@@ -365,7 +292,7 @@ function renderFailuresIndex(view: View, t: Strings): string {
 /*  Table of contents                                                          */
 /* -------------------------------------------------------------------------- */
 
-function renderToc(view: View, t: Strings): string {
+function renderToc(view: View): string {
   if (view.toc.length === 0) return ''
   const items = view.toc
     .map(
@@ -381,8 +308,8 @@ function renderToc(view: View, t: Strings): string {
   return `
 <section id="${TOC_ANCHOR}" class="page page--toc">
   <div class="page-header">
-    <span class="eyebrow">${esc(t.contents)}</span>
-    <h2 class="page-header__h2">${esc(t.contents)}</h2>
+    <span class="eyebrow">${esc(L.contents)}</span>
+    <h2 class="page-header__h2">${esc(L.contents)}</h2>
   </div>
   <ol class="toc">${items}</ol>
 </section>`
@@ -392,7 +319,7 @@ function renderToc(view: View, t: Strings): string {
 /*  Cases                                                                      */
 /* -------------------------------------------------------------------------- */
 
-function chips(meta: SpecMeta, t: Strings): string {
+function chips(meta: SpecMeta): string {
   const out: string[] = []
   if (meta.requirementId) {
     out.push(
@@ -413,19 +340,19 @@ function chips(meta: SpecMeta, t: Strings): string {
   return out.length > 0 ? `<div class="case__chips">${out.join('')}</div>` : ''
 }
 
-function renderError(c: ViewCase, includeStack: boolean, t: Strings): string {
+function renderError(c: ViewCase, includeStack: boolean): string {
   if (!c.error) return ''
   const stack = includeStack && c.error.stack
     ? `
       <div class="error__section">
-        <div class="error__label">${esc(t.stack)}</div>
+        <div class="error__label">${esc(L.stack)}</div>
         <pre class="error__pre">${esc(c.error.stack)}</pre>
       </div>`
     : ''
   const diff = c.error.diff
     ? `
       <div class="error__section">
-        <div class="error__label">${esc(t.diff)}</div>
+        <div class="error__label">${esc(L.diff)}</div>
         <pre class="error__pre error__pre--diff">${esc(c.error.diff)}</pre>
       </div>`
     : ''
@@ -449,17 +376,17 @@ function statusGlyph(s: TestStatus): string {
   }
 }
 
-function renderCase(c: ViewCase, t: Strings, opts: ResolvedPdfReporterOptions): string {
+function renderCase(c: ViewCase, opts: ResolvedPdfReporterOptions): string {
   const desc = c.meta.description
     ? `<div class="case__desc">${esc(String(c.meta.description))}</div>`
     : ''
 
   const annot: string[] = []
   if (c.meta.precondition) {
-    annot.push(`<div class="case__kv"><span class="case__kv-key">${esc(t.metaPrecondition)}</span><span>${esc(String(c.meta.precondition))}</span></div>`)
+    annot.push(`<div class="case__kv"><span class="case__kv-key">${esc(L.metaPrecondition)}</span><span>${esc(String(c.meta.precondition))}</span></div>`)
   }
   if (c.meta.note) {
-    annot.push(`<div class="case__kv"><span class="case__kv-key">${esc(t.metaNote)}</span><span>${esc(String(c.meta.note))}</span></div>`)
+    annot.push(`<div class="case__kv"><span class="case__kv-key">${esc(L.metaNote)}</span><span>${esc(String(c.meta.note))}</span></div>`)
   }
   const annotBlock = annot.length > 0 ? `<div class="case__annot">${annot.join('')}</div>` : ''
 
@@ -468,12 +395,12 @@ function renderCase(c: ViewCase, t: Strings, opts: ResolvedPdfReporterOptions): 
     <div class="case__main">
       <span class="case__status">${statusGlyph(c.status)}</span>
       <span class="case__name">${esc(c.name)}</span>
-      ${chips(c.meta, t)}
+      ${chips(c.meta)}
       <span class="case__duration mono">${fmtDuration(c.durationMs)}</span>
     </div>
     ${desc}
     ${annotBlock}
-    ${renderError(c, opts.includeStackTrace, t)}
+    ${renderError(c, opts.includeStackTrace)}
   </li>`
 }
 
@@ -481,12 +408,12 @@ function renderCase(c: ViewCase, t: Strings, opts: ResolvedPdfReporterOptions): 
 /*  Sections                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function renderSection(s: ViewSection, t: Strings, opts: ResolvedPdfReporterOptions): string {
+function renderSection(s: ViewSection, opts: ResolvedPdfReporterOptions): string {
   const headingTag = `h${Math.min(s.depth + 1, 6)}`
   const sectionCases = s.cases.length > 0
-    ? `<ol class="cases">${s.cases.map((c) => renderCase(c, t, opts)).join('')}</ol>`
+    ? `<ol class="cases">${s.cases.map((c) => renderCase(c, opts)).join('')}</ol>`
     : ''
-  const subSections = s.children.map((c) => renderSection(c, t, opts)).join('')
+  const subSections = s.children.map((c) => renderSection(c, opts)).join('')
   const subtitle = s.subtitle
     ? `<div class="section__subtitle mono">${esc(s.subtitle)}</div>`
     : ''
@@ -1180,15 +1107,14 @@ export interface RenderHtmlInput {
 }
 
 export function renderHtml({ view, options }: RenderHtmlInput): string {
-  const t = TXT[options.locale]
-  const cover = options.includeCoverPage ? renderCover(view, t) : ''
-  const failures = renderFailuresIndex(view, t)
-  const toc = options.includeTableOfContents ? renderToc(view, t) : ''
-  const body = view.sections.map((s) => renderSection(s, t, options)).join('')
+  const cover = options.includeCoverPage ? renderCover(view) : ''
+  const failures = renderFailuresIndex(view)
+  const toc = options.includeTableOfContents ? renderToc(view) : ''
+  const body = view.sections.map((s) => renderSection(s, options)).join('')
   const customCss = options.customCss ? `\n/* customCss */\n${options.customCss}` : ''
 
   return `<!doctype html>
-<html lang="${options.locale}">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>${esc(view.title)}</title>
@@ -1208,7 +1134,6 @@ ${toc}
 /* -------------------------------------------------------------------------- */
 
 export function renderFooterTemplate(view: View): string {
-  const t = TXT[view.options.locale]
   return `
 <div style="
   width: 100%;
@@ -1225,7 +1150,7 @@ export function renderFooterTemplate(view: View): string {
   <span style="font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;">
     <span class="pageNumber"></span> / <span class="totalPages"></span>
   </span>
-  <span style="text-transform: uppercase; letter-spacing: 0.18em;">${esc(t.docKind)}</span>
+  <span style="text-transform: uppercase; letter-spacing: 0.18em;">${esc(L.docKind)}</span>
 </div>`
 }
 

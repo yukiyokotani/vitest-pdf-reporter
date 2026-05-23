@@ -10,9 +10,10 @@ Turn your `describe` / `it` hierarchy into a **single-source-of-truth specificat
 
 - **Tests *are* the spec.** Stop double-maintaining a Word file alongside your test suite.
 - **Shippable.** A4 PDF you can hand to a client, attach to a release, or print.
-- **Designed.** Strict 12-column grid, large display titles, mono numerals, and one accent color used sparingly. Looks like an editorial document, not a build log.
+- **Designed.** shadcn-inspired editorial layout — donut pass-rate gauge on the cover, KPI cards with mini progress bars, pill badges. Looks like a real document, not a build log.
 - **Rich metadata.** Per-test `task.meta` is rendered as requirement IDs, priority badges, preconditions, and notes.
-- **Failure-aware.** Failing tests are highlighted; error messages, diffs, and trimmed stack traces are included inline.
+- **Failure-aware.** Failing tests are highlighted; error messages, diffs, and trimmed stack traces are included inline. The cover links straight to each failure.
+- **Content is yours.** Titles, project names, describes, and metadata flow through verbatim and accept any language. Structural labels (Pass Rate, Failures, Contents…) are fixed English.
 
 ## Installation
 
@@ -102,14 +103,13 @@ new PdfReporter({
   title: 'My Test Spec',                       // cover title
   projectName: 'Acme',                         // cover header + footer
   version: '1.2.0',                            // shown under the title
-  locale: 'ja',                                // 'ja' | 'en' — labels & date format
   paperSize: 'A4',                             // 'A4' | 'Letter'
   orientation: 'portrait',                     // 'portrait' | 'landscape'
   includeCoverPage: true,
   includeTableOfContents: true,
   includeStackTrace: true,                     // include trimmed stack in failures
   theme: 'default',                            // 'default' | 'minimal'
-  customCss: '.cover__title { color: hotpink }', // append to the built-in stylesheet
+  customCss: '.cover-title__h1 { color: hotpink }', // append to the built-in stylesheet
   logoPath: undefined,                         // reserved
 })
 ```
