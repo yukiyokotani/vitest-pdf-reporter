@@ -25,8 +25,6 @@ function esc(s: string | number | undefined | null): string {
 /* -------------------------------------------------------------------------- */
 
 function fmtDate(d: Date): string {
-  // Stable ISO-style format. Avoids Intl locale quirks across CI / OS combos
-  // and keeps the cover header looking the same everywhere.
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
@@ -36,12 +34,21 @@ function fmtDuration(ms: number): string {
   return `${Math.round(ms)}ms`
 }
 
+function statusBadgeVariant(s: TestStatus): string {
+  switch (s) {
+    case 'pass': return 'badge--success'
+    case 'fail': return 'badge--destructive'
+    case 'skip': return 'badge--muted'
+    case 'todo': return 'badge--outline'
+  }
+}
+
 function statusLabel(s: TestStatus): string {
   return ({ pass: 'PASS', fail: 'FAIL', skip: 'SKIP', todo: 'TODO' } as const)[s]
 }
 
 function priorityVariant(priority: string | undefined): string {
-  if (!priority) return ''
+  if (!priority) return 'badge--outline'
   const p = priority.toLowerCase()
   if (p === '高' || p === 'high') return 'badge--destructive'
   if (p === '中' || p === 'medium' || p === 'mid') return 'badge--warning'
@@ -50,37 +57,42 @@ function priorityVariant(priority: string | undefined): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Strings                                                                    */
+/*  Labels — fixed English strings.                                            */
 /* -------------------------------------------------------------------------- */
 
-// Fixed English labels. Content (titles, test names, metadata) flows
-// through from the user's tests verbatim and supports any language —
-// only the structural labels are locked to English.
 const L = {
   docKind: 'TEST SPECIFICATION',
-  passRate: 'Pass Rate',
-  total: 'Total',
-  passed: 'Passed',
-  failed: 'Failed',
-  skipped: 'Skipped',
-  todo: 'Todo',
-  duration: 'Duration',
-  files: 'Files',
-  contents: 'Contents',
+  passRate: 'PASS RATE',
+  total: 'TOTAL',
+  passed: 'PASSED',
+  failed: 'FAILED',
+  skipped: 'SKIPPED',
+  todo: 'TODO',
+  duration: 'DURATION',
+  files: 'FILES',
+  contents: 'CONTENTS',
   generated: 'Generated',
-  metaReq: 'Req ID',
-  metaCategory: 'Category',
-  metaPriority: 'Priority',
+  metaReq: 'REQ ID',
+  metaCategory: 'CATEGORY',
+  metaPriority: 'PRIORITY',
   metaPrecondition: 'Precondition',
   metaNote: 'Note',
-  error: 'Error',
-  stack: 'Stack trace',
-  diff: 'Diff',
-  failures: 'Failures',
+  error: 'ERROR',
+  stack: 'STACK TRACE',
+  diff: 'DIFF',
+  failures: 'FAILURES',
   failuresLede: 'Tests that did not pass. Click any row to jump to the detail.',
-  showAll: 'View all',
-  intro: 'Auto-generated specification from your test suite.',
+  viewAll: 'View all →',
+  intro: 'Auto-generated specification — from your test suite.',
 } as const
+
+/* -------------------------------------------------------------------------- */
+/*  Status badge as a shadcn Badge                                             */
+/* -------------------------------------------------------------------------- */
+
+function statusBadge(s: TestStatus): string {
+  return `<span class="badge ${statusBadgeVariant(s)} badge--status">${statusLabel(s)}</span>`
+}
 
 /* -------------------------------------------------------------------------- */
 /*  SVG donut gauge                                                            */
@@ -89,9 +101,6 @@ const L = {
 function gauge(view: View): string {
   const { summary } = view
   const pct = Math.max(0, Math.min(100, summary.passRate * 100))
-  // r=50 → circumference = 2π·50 ≈ 314.159. Using explicit numbers avoids
-  // SVG renderers that don't honor `pathLength` reliably (notably Chromium
-  // headless print in some configurations).
   const C = 314.159
   const dash = (pct / 100) * C
   const fillClass = summary.failed > 0
@@ -103,18 +112,15 @@ function gauge(view: View): string {
   return `
 <div class="gauge">
   <svg viewBox="0 0 120 120" aria-hidden="true">
-    <circle class="gauge__track" cx="60" cy="60" r="50" fill="none"
-      stroke-width="10"/>
+    <circle class="gauge__track" cx="60" cy="60" r="50" fill="none" stroke-width="8"/>
     <circle class="${fillClass}" cx="60" cy="60" r="50" fill="none"
-      stroke-width="10" stroke-linecap="round"
+      stroke-width="8" stroke-linecap="round"
       stroke-dasharray="${dash.toFixed(2)} ${C.toFixed(2)}"
       transform="rotate(-90 60 60)"/>
   </svg>
   <div class="gauge__center">
-    <div class="gauge__num">
-      <span>${pct.toFixed(1)}</span><span class="gauge__pct">%</span>
-    </div>
-    <div class="gauge__label">${summary.passed} / ${summary.total}</div>
+    <div class="gauge__num"><span>${pct.toFixed(1)}</span><span class="gauge__pct">%</span></div>
+    <div class="gauge__sub mono">${summary.passed} / ${summary.total}</div>
   </div>
 </div>`
 }
@@ -123,89 +129,67 @@ function gauge(view: View): string {
 /*  Cover                                                                      */
 /* -------------------------------------------------------------------------- */
 
+function pctOf(n: number, total: number): number {
+  if (total === 0) return 0
+  return (n / total) * 100
+}
+
 function renderCover(view: View): string {
   const { summary } = view
   const hasFailures = summary.failed > 0
   const hasToc = view.options.includeTableOfContents && view.toc.length > 0
 
-  const link = (target: string, body: string, cls = '') =>
-    `<a class="kpi-link ${cls}" href="#${target}">${body}</a>`
+  const link = (target: string, body: string) =>
+    `<a class="kpi-link" href="#${target}">${body}</a>`
 
-  const totalInner = `
-      <div class="kpi__label">${esc(L.total)}</div>
-      <div class="kpi__num">${summary.total}</div>
-      <div class="kpi__caption">${summary.fileCount} ${esc(L.files.toLowerCase())}</div>`
+  const kpi = (variant: '' | 'is-pass' | 'is-fail' | 'is-skip' | 'is-todo' | 'is-mono', label: string, value: string | number, sub?: string, bar?: number) => {
+    const barHtml = bar !== undefined
+      ? `<div class="bar"><div class="bar__fill" style="width:${bar}%"></div></div>`
+      : ''
+    return `
+      <div class="kpi__inner">
+        <div class="kpi__label">${esc(label)}</div>
+        <div class="kpi__num ${variant}">${esc(value)}</div>
+        ${sub ? `<div class="kpi__sub">${esc(sub)}</div>` : ''}
+        ${barHtml}
+      </div>`
+  }
+
+  const fileLabel = summary.fileCount === 1 ? 'file' : 'files'
+  const totalContent = kpi('', L.total, summary.total, `${summary.fileCount} ${fileLabel}`)
   const totalCard = hasToc
-    ? `<div class="card kpi kpi--clickable">${link(TOC_ANCHOR, totalInner)}</div>`
-    : `<div class="card kpi">${totalInner}</div>`
+    ? `<div class="card kpi kpi--clickable">${link(TOC_ANCHOR, totalContent)}</div>`
+    : `<div class="card kpi">${totalContent}</div>`
 
-  const passedCard = `
-    <div class="card kpi">
-      <div class="kpi__label">
-        <span class="dot dot--success"></span>${esc(L.passed)}
-      </div>
-      <div class="kpi__num">${summary.passed}</div>
-      <div class="bar"><div class="bar__fill bar__fill--success" style="width:${pctOf(summary.passed, summary.total)}%"></div></div>
-    </div>`
+  const passedCard = `<div class="card kpi kpi--pass">${kpi('is-pass', L.passed, summary.passed, undefined, pctOf(summary.passed, summary.total))}</div>`
 
-  const failedInner = `
-      <div class="kpi__label">
-        <span class="dot dot--destructive"></span>${esc(L.failed)}
-      </div>
-      <div class="kpi__num kpi__num--destructive">${summary.failed}</div>
-      <div class="bar"><div class="bar__fill bar__fill--destructive" style="width:${pctOf(summary.failed, summary.total)}%"></div></div>`
+  const failedContent = kpi('is-fail', L.failed, summary.failed, undefined, pctOf(summary.failed, summary.total))
   const failedCard = hasFailures
-    ? `<div class="card kpi kpi--clickable">${link(FAILURES_ANCHOR, failedInner)}</div>`
-    : `<div class="card kpi">${failedInner}</div>`
+    ? `<div class="card kpi kpi--fail kpi--clickable">${link(FAILURES_ANCHOR, failedContent)}</div>`
+    : `<div class="card kpi">${failedContent}</div>`
 
-  const skippedCard = `
-    <div class="card kpi">
-      <div class="kpi__label">
-        <span class="dot dot--muted"></span>${esc(L.skipped)}
-      </div>
-      <div class="kpi__num">${summary.skipped}</div>
-      <div class="bar"><div class="bar__fill bar__fill--muted" style="width:${pctOf(summary.skipped, summary.total)}%"></div></div>
-    </div>`
+  const skippedCard = `<div class="card kpi">${kpi('is-skip', L.skipped, summary.skipped, undefined, pctOf(summary.skipped, summary.total))}</div>`
+  const todoCard = `<div class="card kpi">${kpi('is-todo', L.todo, summary.todo, undefined, pctOf(summary.todo, summary.total))}</div>`
+  const durationCard = `<div class="card kpi">${kpi('is-mono', L.duration, fmtDuration(summary.durationMs), `${L.generated} ${fmtDate(view.generatedAt)}`)}</div>`
 
-  const todoCard = `
-    <div class="card kpi">
-      <div class="kpi__label">
-        <span class="dot dot--warning"></span>${esc(L.todo)}
-      </div>
-      <div class="kpi__num">${summary.todo}</div>
-      <div class="bar"><div class="bar__fill bar__fill--warning" style="width:${pctOf(summary.todo, summary.total)}%"></div></div>
-    </div>`
-
-  const durationCard = `
-    <div class="card kpi">
-      <div class="kpi__label">${esc(L.duration)}</div>
-      <div class="kpi__num kpi__num--mono">${fmtDuration(summary.durationMs)}</div>
-      <div class="kpi__caption">${esc(L.generated)} ${esc(fmtDate(view.generatedAt))}</div>
-    </div>`
-
-  // Inline failure preview (first 5). The KPI tile's `#failures` link lands
-  // here on the cover when there are 5 or fewer failures — no need for a
-  // sparsely-populated standalone page. When there are more, the standalone
-  // page below is rendered with the full list and owns the anchor.
   const inlineFailures = hasFailures && view.failures.length <= 5
   const previewId = inlineFailures ? FAILURES_ANCHOR : ''
-  const previewMoreLink = !inlineFailures
-    ? `<a class="cover-failures__more" href="#${FAILURES_ANCHOR}">${esc(L.showAll)} →</a>`
+  const previewMoreLink = !inlineFailures && hasFailures
+    ? `<a class="failures-card__more mono" href="#${FAILURES_ANCHOR}">${esc(L.viewAll)}</a>`
     : ''
   const failurePreview = hasFailures
     ? `
-    <section class="cover-failures"${previewId ? ` id="${previewId}"` : ''}>
-      <div class="cover-failures__head">
+    <div class="card failures-card"${previewId ? ` id="${previewId}"` : ''}>
+      <div class="failures-card__head">
         <span class="eyebrow">${esc(L.failures)}</span>
         ${previewMoreLink}
       </div>
-      <ol class="cover-failures__list">
-        ${view.failures.slice(0, 5).map((f) => failureRow(f, 'cover')).join('')}
+      <ol class="failures-list">
+        ${view.failures.slice(0, 5).map((f) => failureRow(f)).join('')}
       </ol>
-    </section>`
+    </div>`
     : ''
 
-  // Slim header strip.
   const headerMeta = [
     view.projectName,
     view.version ? `v${view.version}` : null,
@@ -217,6 +201,7 @@ function renderCover(view: View): string {
 
   return `
 <section class="page page--cover">
+  <div class="cover-stripe"></div>
   <header class="cover-header">
     <span class="eyebrow">${esc(L.docKind)}</span>
     <span class="eyebrow eyebrow--meta">${headerMeta}</span>
@@ -229,8 +214,10 @@ function renderCover(view: View): string {
 
   <div class="cover-grid">
     <div class="card gauge-card">
+      <div class="gauge-card__head">
+        <span class="eyebrow">${esc(L.passRate)}</span>
+      </div>
       ${gauge(view)}
-      <div class="gauge-caption">${esc(L.passRate)}</div>
     </div>
     <div class="kpi-grid">
       ${totalCard}
@@ -246,45 +233,42 @@ function renderCover(view: View): string {
 </section>`
 }
 
-function pctOf(n: number, total: number): number {
-  if (total === 0) return 0
-  return (n / total) * 100
-}
-
 /* -------------------------------------------------------------------------- */
-/*  Failures index (full page) and inline failure row                          */
+/*  Failure row (used by cover preview and standalone failures page)           */
 /* -------------------------------------------------------------------------- */
 
-function failureRow(f: ViewFailure, ctx: 'cover' | 'page'): string {
+function failureRow(f: ViewFailure): string {
   return `
-  <li class="failure-row failure-row--${ctx}">
+  <li class="failure-row">
     <a class="failure-row__link" href="#${esc(f.caseId)}">
-      <span class="badge badge--destructive failure-row__badge">FAIL</span>
-      <span class="mono failure-row__num">${esc(f.sectionNumber)}</span>
-      <span class="failure-row__body">
-        <span class="failure-row__name">${esc(f.name)}</span>
-        <span class="failure-row__path">${esc(f.sectionPath)}</span>
-      </span>
-      ${f.requirementId ? `<span class="mono failure-row__req">${esc(f.requirementId)}</span>` : `<span class="failure-row__req"></span>`}
-      <span class="failure-row__arrow mono" aria-hidden="true">→</span>
+      <span class="badge badge--destructive badge--status">FAIL</span>
+      <div class="failure-row__body">
+        <div class="failure-row__top">
+          <span class="failure-row__num mono">${esc(f.sectionNumber)}</span>
+          <span class="failure-row__name">${esc(f.name)}</span>
+          ${f.requirementId ? `<span class="badge badge--outline mono failure-row__req">${esc(f.requirementId)}</span>` : `<span></span>`}
+          <span class="failure-row__arrow mono">→</span>
+        </div>
+        <div class="failure-row__path">${esc(f.sectionPath)}</div>
+      </div>
     </a>
   </li>`
 }
 
 function renderFailuresIndex(view: View): string {
-  // Only emit the standalone page when the cover preview can't show every
-  // failure (>5). Otherwise the cover preview owns the `failures` anchor.
   if (view.failures.length <= 5) return ''
   return `
 <section id="${FAILURES_ANCHOR}" class="page page--failures">
   <div class="page-header">
     <span class="eyebrow">${esc(L.failures)}</span>
-    <h2 class="page-header__h2">${esc(L.failures)}</h2>
+    <h2 class="page-header__h2">Failures</h2>
     <p class="page-header__lede">${esc(L.failuresLede)}</p>
   </div>
-  <ol class="failures-list">
-    ${view.failures.map((f) => failureRow(f, 'page')).join('')}
-  </ol>
+  <div class="card failures-card">
+    <ol class="failures-list">
+      ${view.failures.map((f) => failureRow(f)).join('')}
+    </ol>
+  </div>
 </section>`
 }
 
@@ -297,10 +281,10 @@ function renderToc(view: View): string {
   const items = view.toc
     .map(
       (e) => `
-    <li class="toc__item toc__item--d${Math.min(e.depth, 4)}">
-      <a class="toc__link" href="#${esc(e.id)}">
-        <span class="mono toc__num">${esc(e.number)}</span>
-        <span class="toc__name">${esc(e.name)}</span>
+    <li class="toc-row toc-row--d${Math.min(e.depth, 4)}">
+      <a class="toc-row__link" href="#${esc(e.id)}">
+        <span class="toc-row__num mono">${esc(e.number)}</span>
+        <span class="toc-row__name">${esc(e.name)}</span>
       </a>
     </li>`,
     )
@@ -309,33 +293,26 @@ function renderToc(view: View): string {
 <section id="${TOC_ANCHOR}" class="page page--toc">
   <div class="page-header">
     <span class="eyebrow">${esc(L.contents)}</span>
-    <h2 class="page-header__h2">${esc(L.contents)}</h2>
+    <h2 class="page-header__h2">Contents</h2>
   </div>
   <ol class="toc">${items}</ol>
 </section>`
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Cases                                                                      */
+/*  Section header + cases                                                     */
 /* -------------------------------------------------------------------------- */
 
 function chips(meta: SpecMeta): string {
   const out: string[] = []
   if (meta.requirementId) {
-    out.push(
-      `<span class="badge badge--outline mono">${esc(String(meta.requirementId))}</span>`,
-    )
+    out.push(`<span class="badge badge--outline mono">${esc(String(meta.requirementId))}</span>`)
   }
   if (meta.category) {
     out.push(`<span class="badge badge--secondary">${esc(String(meta.category))}</span>`)
   }
   if (meta.priority) {
-    const cls = priorityVariant(String(meta.priority))
-    out.push(
-      `<span class="badge ${cls}">
-        <span class="badge__label">P</span>${esc(String(meta.priority))}
-      </span>`,
-    )
+    out.push(`<span class="badge ${priorityVariant(String(meta.priority))}">P ${esc(String(meta.priority))}</span>`)
   }
   return out.length > 0 ? `<div class="case__chips">${out.join('')}</div>` : ''
 }
@@ -357,59 +334,47 @@ function renderError(c: ViewCase, includeStack: boolean): string {
       </div>`
     : ''
   return `
-    <div class="error">
+    <div class="error" role="alert">
       <div class="error__head">
-        <span class="badge badge--destructive">FAIL</span>
-        <span class="error__msg">${esc(c.error.message)}</span>
+        <span class="badge badge--destructive">${esc(L.error)}</span>
+        <span class="error__msg mono">${esc(c.error.message)}</span>
       </div>
       ${diff}
       ${stack}
     </div>`
 }
 
-function statusGlyph(s: TestStatus): string {
-  switch (s) {
-    case 'pass': return '✓'
-    case 'fail': return '✕'
-    case 'skip': return '–'
-    case 'todo': return '○'
-  }
-}
-
 function renderCase(c: ViewCase, opts: ResolvedPdfReporterOptions): string {
   const desc = c.meta.description
-    ? `<div class="case__desc">${esc(String(c.meta.description))}</div>`
+    ? `<p class="case__desc">${esc(String(c.meta.description))}</p>`
     : ''
 
-  const annot: string[] = []
+  const kvs: string[] = []
   if (c.meta.precondition) {
-    annot.push(`<div class="case__kv"><span class="case__kv-key">${esc(L.metaPrecondition)}</span><span>${esc(String(c.meta.precondition))}</span></div>`)
+    kvs.push(`<div class="case__kv"><dt>${esc(L.metaPrecondition)}</dt><dd>${esc(String(c.meta.precondition))}</dd></div>`)
   }
   if (c.meta.note) {
-    annot.push(`<div class="case__kv"><span class="case__kv-key">${esc(L.metaNote)}</span><span>${esc(String(c.meta.note))}</span></div>`)
+    kvs.push(`<div class="case__kv"><dt>${esc(L.metaNote)}</dt><dd>${esc(String(c.meta.note))}</dd></div>`)
   }
-  const annotBlock = annot.length > 0 ? `<div class="case__annot">${annot.join('')}</div>` : ''
+  const kvBlock = kvs.length > 0 ? `<dl class="case__kvs">${kvs.join('')}</dl>` : ''
 
   return `
   <li class="case is-${c.status}" id="${esc(c.id)}">
-    <div class="case__main">
-      <span class="case__status">${statusGlyph(c.status)}</span>
-      <span class="case__name">${esc(c.name)}</span>
+    <div class="case__rail">${statusBadge(c.status)}</div>
+    <div class="case__body">
+      <div class="case__top">
+        <h4 class="case__name">${esc(c.name)}</h4>
+        <span class="case__duration mono">${fmtDuration(c.durationMs)}</span>
+      </div>
       ${chips(c.meta)}
-      <span class="case__duration mono">${fmtDuration(c.durationMs)}</span>
+      ${desc}
+      ${kvBlock}
+      ${renderError(c, opts.includeStackTrace)}
     </div>
-    ${desc}
-    ${annotBlock}
-    ${renderError(c, opts.includeStackTrace)}
   </li>`
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Sections                                                                   */
-/* -------------------------------------------------------------------------- */
-
 function renderSection(s: ViewSection, opts: ResolvedPdfReporterOptions): string {
-  const headingTag = `h${Math.min(s.depth + 1, 6)}`
   const sectionCases = s.cases.length > 0
     ? `<ol class="cases">${s.cases.map((c) => renderCase(c, opts)).join('')}</ol>`
     : ''
@@ -418,12 +383,13 @@ function renderSection(s: ViewSection, opts: ResolvedPdfReporterOptions): string
     ? `<div class="section__subtitle mono">${esc(s.subtitle)}</div>`
     : ''
   const sectionCls = `section section--d${s.depth}`
+  const headingTag = `h${Math.min(s.depth + 1, 6)}`
   return `
 <section id="${esc(s.id)}" class="${sectionCls}">
-  <div class="section__header">
+  <header class="section__head">
     <span class="section__num mono">${esc(s.number)}</span>
     <${headingTag} class="section__title">${esc(s.name)}</${headingTag}>
-  </div>
+  </header>
   ${subtitle}
   ${sectionCases}
   ${subSections}
@@ -431,7 +397,7 @@ function renderSection(s: ViewSection, opts: ResolvedPdfReporterOptions): string
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Stylesheet — shadcn/ui token system, print-sized                           */
+/*  Stylesheet — shadcn/ui tokens with strict master rail                      */
 /* -------------------------------------------------------------------------- */
 
 function styles(theme: 'default' | 'minimal'): string {
@@ -448,16 +414,18 @@ function styles(theme: 'default' | 'minimal'): string {
     --primary-foreground: 0 0% 98%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
     --destructive: 240 5.9% 10%;
     --destructive-soft: 240 4.8% 95.9%;
     --destructive-foreground: 0 0% 98%;
     --success: 240 5.9% 25%;
+    --success-foreground: 0 0% 98%;
     --success-soft: 240 4.8% 95.9%;
     --warning: 240 5.9% 35%;
+    --warning-foreground: 0 0% 98%;
     --warning-soft: 240 4.8% 95.9%;
     --radius: 6px;
+    --rail-w: 20mm;
+    --rail-gap: 5mm;
       `
       : `
     --background: 0 0% 100%;
@@ -470,16 +438,18 @@ function styles(theme: 'default' | 'minimal'): string {
     --primary-foreground: 0 0% 98%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
     --destructive: 0 72.2% 50.6%;
     --destructive-soft: 0 86% 97%;
     --destructive-foreground: 0 0% 98%;
     --success: 142 71% 36%;
+    --success-foreground: 0 0% 98%;
     --success-soft: 142 76% 96%;
     --warning: 38 92% 42%;
+    --warning-foreground: 0 0% 98%;
     --warning-soft: 48 96% 93%;
     --radius: 6px;
+    --rail-w: 20mm;
+    --rail-gap: 5mm;
       `
 
   return `
@@ -513,19 +483,10 @@ html, body {
 }
 
 a { color: inherit; text-decoration: none; }
-a:hover { color: inherit; }
 
-/* ---- Primitives --------------------------------------------------------- */
-
-.eyebrow {
-  font-family: "JetBrains Mono", "SF Mono", Menlo, ui-monospace, monospace;
-  font-size: 6.5pt;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-  font-weight: 500;
-}
-.eyebrow--meta { color: hsl(var(--muted-foreground)); }
+/* ────────────────────────────────────────────────────────────────────────── *
+ *  PRIMITIVES — shadcn/ui faithful                                            *
+ * ────────────────────────────────────────────────────────────────────────── */
 
 .card {
   background: hsl(var(--background));
@@ -533,79 +494,86 @@ a:hover { color: inherit; }
   border-radius: var(--radius);
 }
 
+/* Badge — shadcn variants. Used everywhere status / tags appear. */
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.5mm;
-  padding: 0.4mm 1.4mm;
-  font-size: 6.4pt;
-  font-weight: 600;
-  line-height: 1.4;
-  border-radius: 999px;
+  justify-content: center;
+  border-radius: calc(var(--radius) - 2px);
   border: 1px solid transparent;
-  letter-spacing: 0.02em;
+  padding: 0.4mm 1.8mm;
+  font-size: 6.6pt;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
   white-space: nowrap;
+  font-feature-settings: "tnum" 1;
 }
-.badge__label {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 5.6pt;
-  letter-spacing: 0.1em;
-  opacity: 0.7;
-  margin-right: 0.6mm;
-}
-.badge--outline {
-  background: hsl(var(--background));
-  border-color: hsl(var(--border));
-  color: hsl(var(--foreground));
-  font-weight: 500;
+.badge--default {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
 }
 .badge--secondary {
   background: hsl(var(--secondary));
   color: hsl(var(--secondary-foreground));
+  border-color: transparent;
 }
 .badge--destructive {
   background: hsl(var(--destructive));
   color: hsl(var(--destructive-foreground));
 }
+.badge--success {
+  background: hsl(var(--success));
+  color: hsl(var(--success-foreground));
+}
 .badge--warning {
-  background: hsl(var(--warning-soft));
-  color: hsl(var(--warning));
-  border-color: hsl(var(--warning) / 0.3);
+  background: hsl(var(--warning));
+  color: hsl(var(--warning-foreground));
 }
 .badge--muted {
   background: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
 }
-
-.dot {
-  display: inline-block;
-  width: 1.6mm;
-  height: 1.6mm;
-  border-radius: 999px;
-  background: hsl(var(--muted-foreground));
-  margin-right: 1mm;
-  flex-shrink: 0;
+.badge--outline {
+  background: hsl(var(--background));
+  border-color: hsl(var(--border-strong));
+  color: hsl(var(--foreground));
+  font-weight: 500;
 }
-.dot--success { background: hsl(var(--success)); }
-.dot--destructive { background: hsl(var(--destructive)); }
-.dot--warning { background: hsl(var(--warning)); }
-.dot--muted { background: hsl(var(--muted-foreground)); }
 
+/* Fixed-width status badge so PASS / FAIL / SKIP / TODO all align. */
+.badge--status {
+  min-width: 14mm;
+  padding: 0.8mm 1.6mm;
+  font-size: 7.4pt;
+  letter-spacing: 0.08em;
+}
+
+.eyebrow {
+  display: inline-block;
+  font-family: "JetBrains Mono", "SF Mono", Menlo, ui-monospace, monospace;
+  font-size: 6.4pt;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+}
+.eyebrow--meta { color: hsl(var(--muted-foreground)); }
+
+/* Mini progress bar used inside KPI cards. */
 .bar {
   width: 100%;
   height: 1.4mm;
   background: hsl(var(--muted));
   border-radius: 999px;
   overflow: hidden;
-  margin-top: 1.6mm;
+  margin-top: 2mm;
 }
-.bar__fill { height: 100%; background: hsl(var(--foreground)); border-radius: 999px; }
-.bar__fill--success { background: hsl(var(--success)); }
-.bar__fill--destructive { background: hsl(var(--destructive)); }
-.bar__fill--warning { background: hsl(var(--warning)); }
-.bar__fill--muted { background: hsl(var(--muted-foreground)); }
+.bar__fill { height: 100%; background: hsl(var(--foreground)); }
 
-/* ---- Page break helpers ------------------------------------------------- */
+/* ────────────────────────────────────────────────────────────────────────── *
+ *  PAGE / SECTION SCAFFOLDING                                                 *
+ * ────────────────────────────────────────────────────────────────────────── */
 
 .page {
   break-after: page;
@@ -616,53 +584,62 @@ a:hover { color: inherit; }
   page-break-after: auto;
 }
 
-.page-header {
-  margin-bottom: 6mm;
-}
+.page-header { margin-bottom: 8mm; }
 .page-header .eyebrow { display: block; margin-bottom: 2mm; }
 .page-header__h2 {
-  font-size: 16pt;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  margin: 0 0 1.5mm 0;
+  font-size: 22pt;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin: 0 0 2mm 0;
   color: hsl(var(--foreground));
+  line-height: 1.05;
 }
 .page-header__lede {
-  font-size: 8.5pt;
+  font-size: 9pt;
   color: hsl(var(--muted-foreground));
   margin: 0;
   max-width: 130mm;
 }
 
-/* ---- Cover -------------------------------------------------------------- */
+/* ────────────────────────────────────────────────────────────────────────── *
+ *  COVER                                                                       *
+ * ────────────────────────────────────────────────────────────────────────── */
 
 .page--cover {
-  padding: 18mm 16mm 18mm 16mm;
+  position: relative;
+  padding: 22mm 16mm 18mm 16mm;
   display: flex;
   flex-direction: column;
-  gap: 8mm;
+  gap: 9mm;
   min-height: 297mm;
 }
+.cover-stripe {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4mm;
+  background: hsl(var(--foreground));
+}
+
 .cover-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
   padding-bottom: 4mm;
   border-bottom: 1px solid hsl(var(--border));
 }
 
 .cover-title { margin-top: 2mm; }
 .cover-title__h1 {
-  font-size: 26pt;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-  margin: 0 0 2mm 0;
+  font-size: 36pt;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.04;
+  margin: 0 0 3mm 0;
   color: hsl(var(--foreground));
-  max-width: 150mm;
+  max-width: 160mm;
 }
 .cover-title__lede {
-  font-size: 8.5pt;
+  font-size: 10pt;
   color: hsl(var(--muted-foreground));
   margin: 0;
   max-width: 130mm;
@@ -670,22 +647,24 @@ a:hover { color: inherit; }
 
 .cover-grid {
   display: grid;
-  grid-template-columns: 78mm 1fr;
+  grid-template-columns: 84mm 1fr;
   gap: 4mm;
   align-items: stretch;
 }
+
+/* Gauge card */
 .gauge-card {
   padding: 6mm;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2mm;
+  gap: 4mm;
 }
+.gauge-card__head { display: flex; justify-content: space-between; }
 .gauge {
   position: relative;
-  width: 56mm;
-  height: 56mm;
+  width: 62mm;
+  height: 62mm;
+  margin: auto;
 }
 .gauge svg { width: 100%; height: 100%; display: block; }
 .gauge__track { stroke: hsl(var(--muted)); }
@@ -700,39 +679,31 @@ a:hover { color: inherit; }
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 0.5mm;
 }
 .gauge__num {
-  font-size: 22pt;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 26pt;
+  font-weight: 800;
+  letter-spacing: -0.035em;
   line-height: 1;
   color: hsl(var(--foreground));
-  font-feature-settings: "tnum" 1;
   display: flex;
   align-items: baseline;
+  font-feature-settings: "tnum" 1;
 }
 .gauge__pct {
-  font-size: 10pt;
+  font-size: 12pt;
   color: hsl(var(--muted-foreground));
-  margin-left: 1mm;
-  font-weight: 500;
+  margin-left: 1.4mm;
+  font-weight: 600;
 }
-.gauge__label {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 7pt;
+.gauge__sub {
+  margin-top: 1.5mm;
+  font-size: 8pt;
   color: hsl(var(--muted-foreground));
   letter-spacing: 0.04em;
 }
-.gauge-caption {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 6.4pt;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-  margin-top: 1mm;
-}
 
+/* KPI grid: 3 columns × 2 rows */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -740,336 +711,328 @@ a:hover { color: inherit; }
   gap: 3mm;
 }
 .kpi {
-  padding: 4mm 5mm;
-  display: flex;
-  flex-direction: column;
-  gap: 1.4mm;
+  position: relative;
+  padding: 0;
 }
+.kpi__inner { padding: 4mm 5mm; display: flex; flex-direction: column; gap: 1.4mm; height: 100%; }
 .kpi__label {
-  display: flex;
-  align-items: center;
-  font-size: 7.2pt;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 6.4pt;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   color: hsl(var(--muted-foreground));
-  letter-spacing: 0.02em;
+  font-weight: 500;
 }
 .kpi__num {
-  font-size: 18pt;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
+  font-size: 22pt;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
   color: hsl(var(--foreground));
+  font-feature-settings: "tnum" 1;
 }
-.kpi__num--destructive { color: hsl(var(--destructive)); }
-.kpi__num--mono { font-family: "JetBrains Mono", monospace; font-size: 14pt; }
-.kpi__caption {
-  font-size: 6.6pt;
+.kpi__num.is-pass { color: hsl(var(--success)); }
+.kpi__num.is-fail { color: hsl(var(--destructive)); }
+.kpi__num.is-skip { color: hsl(var(--muted-foreground)); }
+.kpi__num.is-todo { color: hsl(var(--warning)); }
+.kpi__num.is-mono {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 16pt;
+}
+.kpi__sub {
+  font-size: 7pt;
   color: hsl(var(--muted-foreground));
-  letter-spacing: 0.02em;
+  margin-top: auto;
 }
-.kpi-link {
-  display: flex;
-  flex-direction: column;
-  gap: 1.4mm;
-  color: inherit;
-}
-.kpi--clickable {
-  position: relative;
-}
+.kpi--pass { border-color: hsl(var(--success) / 0.35); }
+.kpi--fail { border-color: hsl(var(--destructive) / 0.4); background: hsl(var(--destructive-soft)); }
+.kpi-link { display: block; color: inherit; height: 100%; }
 .kpi--clickable::after {
   content: "→";
   position: absolute;
-  top: 3mm;
-  right: 3.6mm;
+  top: 3.4mm;
+  right: 4mm;
   font-family: "JetBrains Mono", monospace;
   font-size: 8pt;
   color: hsl(var(--muted-foreground));
 }
+.kpi__inner .bar__fill { background: hsl(var(--foreground)); }
+.kpi--pass .bar__fill { background: hsl(var(--success)); }
+.kpi--fail .bar__fill { background: hsl(var(--destructive)); }
+.kpi .is-skip ~ .bar .bar__fill,
+.kpi .is-todo ~ .bar .bar__fill { background: hsl(var(--muted-foreground)); }
 
-/* ---- Cover failures preview --------------------------------------------- */
+/* ────────────────────────────────────────────────────────────────────────── *
+ *  FAILURES CARD (cover preview + standalone page)                            *
+ * ────────────────────────────────────────────────────────────────────────── */
 
-.cover-failures { margin-top: 1mm; }
-.cover-failures__head {
+.failures-card { padding: 0; overflow: hidden; }
+.failures-card__head {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  padding-bottom: 2mm;
-  margin-bottom: 1mm;
+  align-items: center;
+  padding: 3mm 5mm;
   border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.4);
 }
-.cover-failures__more {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 7pt;
+.failures-card__more {
   color: hsl(var(--muted-foreground));
+  font-size: 7pt;
   letter-spacing: 0.04em;
 }
-.cover-failures__list { list-style: none; margin: 0; padding: 0; }
-
-/* ---- Failures list (shared cover + page) -------------------------------- */
-
-.failures-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: hsl(var(--background));
-}
-.cover-failures .failures-list,
-.cover-failures__list {
-  border: none;
-  border-radius: 0;
-}
-.failure-row {
-  border-bottom: 1px solid hsl(var(--border));
-}
+.failures-list { list-style: none; margin: 0; padding: 0; }
+.failure-row { border-bottom: 1px solid hsl(var(--border)); }
 .failure-row:last-child { border-bottom: none; }
 .failure-row__link {
   display: grid;
-  grid-template-columns: 12mm 12mm 1fr 28mm 6mm;
+  grid-template-columns: var(--rail-w) 1fr;
+  gap: var(--rail-gap);
+  padding: 3mm 5mm 3mm 5mm;
   align-items: center;
-  gap: 2.5mm;
-  padding: 2.6mm 4mm;
   color: inherit;
 }
-.failure-row__badge { justify-self: center; }
-.failure-row__num {
-  font-size: 8.4pt;
-  font-weight: 600;
-  color: hsl(var(--foreground));
+.failure-row__body { display: flex; flex-direction: column; gap: 1mm; min-width: 0; }
+.failure-row__top {
+  display: grid;
+  grid-template-columns: 12mm 1fr auto 4mm;
+  align-items: baseline;
+  gap: 3mm;
 }
-.failure-row__body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6mm;
-  min-width: 0;
+.failure-row__num {
+  font-size: 8.6pt;
+  color: hsl(var(--foreground));
+  font-weight: 600;
 }
 .failure-row__name {
-  font-size: 9pt;
+  font-size: 9.4pt;
   font-weight: 600;
   color: hsl(var(--foreground));
   letter-spacing: -0.005em;
 }
-.failure-row__path {
-  font-size: 7.2pt;
-  color: hsl(var(--muted-foreground));
-}
 .failure-row__req {
-  font-size: 7.2pt;
+  font-size: 7pt;
   color: hsl(var(--muted-foreground));
-  text-align: right;
-  letter-spacing: 0.04em;
 }
 .failure-row__arrow {
   text-align: right;
   color: hsl(var(--muted-foreground));
   font-size: 9pt;
 }
+.failure-row__path {
+  font-size: 7.4pt;
+  color: hsl(var(--muted-foreground));
+  padding-left: 0;
+}
 
-.page--failures { padding-top: 2mm; }
+.page--failures .failures-card__head { display: none; }
+.page--failures .failure-row__link { padding-left: 5mm; padding-right: 5mm; }
 
-/* ---- TOC ---------------------------------------------------------------- */
+/* ────────────────────────────────────────────────────────────────────────── *
+ *  TABLE OF CONTENTS                                                          *
+ * ────────────────────────────────────────────────────────────────────────── */
 
-.page--toc { padding-top: 2mm; }
 .toc {
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid hsl(var(--border));
+  border-top: 1px solid hsl(var(--border-strong));
 }
-.toc__item { border-bottom: 1px solid hsl(var(--border)); }
-.toc__link {
+.toc-row { border-bottom: 1px solid hsl(var(--border)); }
+.toc-row__link {
   display: grid;
-  grid-template-columns: 16mm 1fr;
-  gap: 3mm;
-  padding: 2mm 0;
+  grid-template-columns: var(--rail-w) 1fr;
+  gap: var(--rail-gap);
+  padding: 2.6mm 0;
   align-items: baseline;
   color: inherit;
 }
-.toc__item--d1 .toc__link {
-  padding: 3mm 0;
-}
-.toc__item--d1 .toc__name {
-  font-weight: 700;
-  font-size: 10pt;
-  letter-spacing: -0.005em;
-}
-.toc__item--d2 .toc__link { padding-left: 6mm; }
-.toc__item--d3 .toc__link { padding-left: 12mm; }
-.toc__item--d4 .toc__link { padding-left: 18mm; }
-.toc__item--d3 .toc__name,
-.toc__item--d4 .toc__name { color: hsl(var(--muted-foreground)); }
-.toc__num {
-  font-size: 7.6pt;
+.toc-row--d1 .toc-row__link { padding: 4mm 0; }
+.toc-row--d1 { border-bottom: 1px solid hsl(var(--border-strong)); }
+.toc-row--d1 .toc-row__num { font-weight: 700; color: hsl(var(--foreground)); font-size: 9.4pt; }
+.toc-row--d1 .toc-row__name { font-weight: 700; font-size: 11pt; letter-spacing: -0.01em; }
+.toc-row--d2 .toc-row__link { padding-left: 6mm; }
+.toc-row--d2 .toc-row__name { font-weight: 600; font-size: 9.6pt; }
+.toc-row--d3 .toc-row__link { padding-left: 12mm; }
+.toc-row--d3 .toc-row__name { color: hsl(var(--muted-foreground)); font-size: 9pt; }
+.toc-row--d4 .toc-row__link { padding-left: 18mm; }
+.toc-row--d4 .toc-row__name { color: hsl(var(--muted-foreground)); font-size: 8.6pt; }
+.toc-row__num {
+  font-size: 7.8pt;
   color: hsl(var(--muted-foreground));
-}
-.toc__item--d1 .toc__num { color: hsl(var(--foreground)); font-weight: 700; }
-.toc__name {
-  font-size: 9pt;
-  color: hsl(var(--foreground));
+  font-weight: 500;
 }
 
-/* ---- Sections ----------------------------------------------------------- */
+/* ────────────────────────────────────────────────────────────────────────── *
+ *  SECTIONS                                                                    *
+ * ────────────────────────────────────────────────────────────────────────── */
 
 .section {}
 .section--d1 {
   break-before: page;
   page-break-before: always;
-  padding-top: 1mm;
 }
-.section__header {
+.section__head {
   display: grid;
-  grid-template-columns: 16mm 1fr;
-  gap: 3mm;
+  grid-template-columns: var(--rail-w) 1fr;
+  gap: var(--rail-gap);
   align-items: baseline;
-  padding-bottom: 3mm;
-  border-bottom: 1px solid hsl(var(--foreground));
-  margin-bottom: 4mm;
-}
-.section--d2 .section__header,
-.section--d3 .section__header,
-.section--d4 .section__header,
-.section--d5 .section__header {
-  border-bottom: 1px solid hsl(var(--border));
-  padding-bottom: 1.6mm;
-  margin-top: 5mm;
-  margin-bottom: 2.5mm;
+  padding-bottom: 4mm;
+  border-bottom: 2px solid hsl(var(--foreground));
+  margin-bottom: 6mm;
 }
 .section__num {
-  font-size: 9pt;
+  font-size: 11pt;
   color: hsl(var(--muted-foreground));
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   font-weight: 500;
 }
 .section--d1 .section__num {
-  font-size: 11pt;
+  font-size: 14pt;
   color: hsl(var(--foreground));
-  font-weight: 600;
+  font-weight: 700;
 }
 .section__title {
   margin: 0;
-  font-size: 14pt;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  line-height: 1.2;
+  font-size: 22pt;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
   color: hsl(var(--foreground));
 }
-.section--d2 .section__title { font-size: 11pt; font-weight: 600; }
-.section--d3 .section__title { font-size: 9.8pt; font-weight: 600; }
-.section--d4 .section__title { font-size: 9.2pt; font-weight: 600; }
-.section--d5 .section__title { font-size: 9pt; font-weight: 600; }
-.section__subtitle {
-  margin-top: -2mm;
+.section--d2 .section__head {
+  border-bottom: 1px solid hsl(var(--border-strong));
+  padding-bottom: 2.6mm;
+  margin-top: 8mm;
+  margin-bottom: 4mm;
+}
+.section--d2 .section__title { font-size: 14pt; font-weight: 700; letter-spacing: -0.015em; }
+.section--d3 .section__head {
+  border-bottom: 1px solid hsl(var(--border));
+  padding-bottom: 2mm;
+  margin-top: 6mm;
   margin-bottom: 3mm;
-  font-size: 7.2pt;
+}
+.section--d3 .section__title { font-size: 11pt; font-weight: 700; letter-spacing: -0.005em; }
+.section--d4 .section__head {
+  border-bottom: 1px solid hsl(var(--border));
+  padding-bottom: 1.4mm;
+  margin-top: 5mm;
+  margin-bottom: 2.5mm;
+}
+.section--d4 .section__title { font-size: 10pt; font-weight: 700; }
+.section--d5 .section__title { font-size: 9.4pt; font-weight: 600; }
+.section__subtitle {
+  font-size: 7.8pt;
   color: hsl(var(--muted-foreground));
+  margin-top: -2mm;
+  margin-bottom: 4mm;
+  padding-left: calc(var(--rail-w) + var(--rail-gap));
 }
 
-/* ---- Cases -------------------------------------------------------------- */
+/* ────────────────────────────────────────────────────────────────────────── *
+ *  CASES                                                                       *
+ * ────────────────────────────────────────────────────────────────────────── */
 
-.cases {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
+.cases { list-style: none; margin: 0; padding: 0; }
 .case {
-  padding: 2mm 0;
+  display: grid;
+  grid-template-columns: var(--rail-w) 1fr;
+  gap: var(--rail-gap);
+  align-items: start;
+  padding: 3mm 0;
   border-bottom: 1px solid hsl(var(--border));
   break-inside: avoid;
   page-break-inside: avoid;
 }
 .case:last-child { border-bottom: none; }
-.case__main {
+.case__rail { padding-top: 0.6mm; }
+
+.case__body { display: flex; flex-direction: column; gap: 1.6mm; min-width: 0; }
+.case__top {
   display: grid;
-  grid-template-columns: 5mm 1fr auto auto;
-  align-items: center;
-  gap: 2.5mm;
+  grid-template-columns: 1fr auto;
+  gap: 4mm;
+  align-items: baseline;
 }
-.case__status {
-  font-size: 10pt;
-  text-align: center;
-  font-weight: 600;
-  line-height: 1;
-  color: hsl(var(--muted-foreground));
-}
-.case.is-pass .case__status { color: hsl(var(--success)); }
-.case.is-fail .case__status { color: hsl(var(--destructive)); }
-.case.is-skip .case__status { color: hsl(var(--muted-foreground)); }
-.case.is-todo .case__status { color: hsl(var(--warning)); }
 .case__name {
-  font-size: 9.4pt;
-  font-weight: 600;
-  color: hsl(var(--foreground));
+  margin: 0;
+  font-size: 10pt;
+  font-weight: 700;
   letter-spacing: -0.005em;
+  color: hsl(var(--foreground));
+  line-height: 1.35;
 }
 .case.is-fail .case__name { color: hsl(var(--destructive)); }
 .case.is-skip .case__name { color: hsl(var(--muted-foreground)); font-weight: 500; }
-.case.is-todo .case__name { color: hsl(var(--foreground)); }
-.case__chips {
-  display: flex;
-  gap: 1mm;
-  align-items: center;
-  flex-wrap: wrap;
-}
 .case__duration {
-  font-size: 7.4pt;
+  font-size: 7.6pt;
   color: hsl(var(--muted-foreground));
-  text-align: right;
   white-space: nowrap;
+  font-feature-settings: "tnum" 1;
 }
 
+.case__chips { display: flex; flex-wrap: wrap; gap: 1mm; }
+
 .case__desc {
-  margin: 1.4mm 0 0 7.5mm;
-  font-size: 8.4pt;
+  margin: 0;
+  font-size: 8.6pt;
   color: hsl(var(--muted-foreground));
   line-height: 1.5;
   max-width: 150mm;
 }
-.case__annot { margin: 1.4mm 0 0 7.5mm; display: flex; flex-direction: column; gap: 0.6mm; }
-.case__kv { display: grid; grid-template-columns: 18mm 1fr; gap: 3mm; align-items: baseline; font-size: 8pt; }
-.case__kv-key {
+
+.case__kvs { margin: 0; display: flex; flex-direction: column; gap: 0.6mm; }
+.case__kv {
+  display: grid;
+  grid-template-columns: 22mm 1fr;
+  gap: 3mm;
+  align-items: baseline;
+  font-size: 8.4pt;
+  margin: 0;
+}
+.case__kv dt {
   font-family: "JetBrains Mono", monospace;
   font-size: 6.6pt;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: hsl(var(--muted-foreground));
+  font-weight: 500;
+  margin: 0;
 }
-.case__kv > span:last-child {
-  color: hsl(var(--foreground));
-}
+.case__kv dd { margin: 0; color: hsl(var(--foreground)); }
 
-/* ---- Error block -------------------------------------------------------- */
+/* ────────────────────────────────────────────────────────────────────────── *
+ *  ERROR (shadcn Alert variant: destructive)                                  *
+ * ────────────────────────────────────────────────────────────────────────── */
 
 .error {
-  margin: 2.5mm 0 1mm 7.5mm;
+  margin-top: 1.5mm;
   background: hsl(var(--destructive-soft));
-  border: 1px solid hsl(var(--destructive) / 0.18);
+  border: 1px solid hsl(var(--destructive) / 0.25);
   border-radius: var(--radius);
   padding: 3mm 4mm;
 }
 .error__head {
   display: flex;
   align-items: center;
-  gap: 2mm;
-  margin-bottom: 2mm;
+  gap: 2.4mm;
+  margin-bottom: 2.4mm;
 }
 .error__msg {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 8.2pt;
+  font-size: 8.4pt;
   color: hsl(var(--destructive));
-  white-space: pre-wrap;
-  word-break: break-word;
   font-weight: 600;
+  word-break: break-word;
 }
-.error__section { margin-top: 2mm; }
+.error__section { margin-top: 2.4mm; }
 .error__label {
   font-family: "JetBrains Mono", monospace;
   font-size: 6.4pt;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: hsl(var(--destructive));
-  font-weight: 600;
-  margin-bottom: 1.2mm;
+  font-weight: 700;
+  margin-bottom: 1.4mm;
 }
 .error__pre {
   margin: 0;
@@ -1078,19 +1041,18 @@ a:hover { color: inherit; }
   line-height: 1.45;
   color: hsl(var(--foreground));
   background: hsl(var(--background));
-  border: 1px solid hsl(var(--destructive) / 0.15);
+  border: 1px solid hsl(var(--destructive) / 0.18);
   border-radius: calc(var(--radius) - 2px);
-  padding: 2.2mm 2.6mm;
+  padding: 2.2mm 2.8mm;
   white-space: pre-wrap;
   word-break: break-word;
 }
-.error__pre--diff { color: hsl(var(--foreground)); }
 
-/* ---- Print niceties ----------------------------------------------------- */
+/* ────────────────────────────────────────────────────────────────────────── *
+ *  PRINT NICETIES                                                              *
+ * ────────────────────────────────────────────────────────────────────────── */
 
-.section__header,
-.section__subtitle,
-.case__main {
+.section__head, .section__subtitle, .case__top {
   break-after: avoid;
   page-break-after: avoid;
 }
@@ -1160,5 +1122,5 @@ export function renderHeaderTemplate(): string {
 
 /* -------------------------------------------------------------------------- */
 
-export const __internal = { esc, fmtDuration, fmtDate, statusGlyph, priorityVariant }
+export const __internal = { esc, fmtDuration, fmtDate, statusLabel, priorityVariant }
 export type { SpecSummary }

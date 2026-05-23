@@ -68,7 +68,7 @@ describe('renderHtml', () => {
     // Error rendered
     expect(html).toContain('expected 1 to be 2')
     // Stack trace block in the error component
-    expect(html).toContain('Stack trace')
+    expect(html).toContain('STACK TRACE')
   })
 
   it('emits intra-document anchor links for navigation', () => {
