@@ -357,36 +357,29 @@ function renderError(c: ViewCase, includeStack: boolean): string {
     </div>`
 }
 
-function caseHasDetail(c: ViewCase): boolean {
-  return c.status === 'fail'
-    || (typeof c.meta.description === 'string' && c.meta.description.length > 0)
-    || (typeof c.meta.precondition === 'string' && c.meta.precondition.length > 0)
-    || (typeof c.meta.note === 'string' && c.meta.note.length > 0)
-    || (typeof c.meta.screenshot === 'string' && c.meta.screenshot.length > 0)
-}
-
 /**
  * Compact case row. One line for the name + duration; if any chips
  * (REQ ID, category, priority) are present they wrap to a second
- * line below. Description, precondition, note, error and screenshot
- * are intentionally NOT rendered here — they belong in the Details
+ * line below. The whole row is a link to the case's detail entry,
+ * so the reader can click anywhere on the row to jump to the
+ * description / precondition / note / error / evidence block.
+ * Description, precondition, note, error and screenshot are
+ * intentionally NOT rendered here — they belong in the Details
  * section.
  */
 function renderCase(c: ViewCase, _opts: ResolvedPdfReporterOptions): string {
-  const arrow = caseHasDetail(c)
-    ? `<a class="case__arrow" href="#detail-${esc(c.id)}" aria-label="open details">→</a>`
-    : '<span class="case__arrow case__arrow--placeholder" aria-hidden="true"></span>'
   return `
   <li class="case is-${c.status}" id="${esc(c.id)}">
-    <div class="case__rail">${statusBadge(c.status)}</div>
-    <div class="case__body">
-      <div class="case__row">
-        <h4 class="case__name">${esc(c.name)}</h4>
-        <span class="case__duration">${fmtDuration(c.durationMs)}</span>
-        ${arrow}
+    <a class="case__link" href="#detail-${esc(c.id)}">
+      <div class="case__rail">${statusBadge(c.status)}</div>
+      <div class="case__body">
+        <div class="case__row">
+          <h4 class="case__name">${esc(c.name)}</h4>
+          <span class="case__duration">${fmtDuration(c.durationMs)}</span>
+        </div>
+        ${chips(c.meta)}
       </div>
-      ${chips(c.meta)}
-    </div>
+    </a>
   </li>`
 }
 
@@ -441,9 +434,9 @@ function renderDetailsSection(view: View, opts: ResolvedPdfReporterOptions): str
   const walk = (s: ViewSection, path: string[]) => {
     const next = [...path, s.name]
     for (const c of s.cases) {
-      if (caseHasDetail(c)) {
-        items.push({ case: c, sectionNumber: s.number, sectionPath: next.join(' › ') })
-      }
+      // Every case gets a detail entry so every summary row has a link
+      // target — even when the entry only carries the status + path.
+      items.push({ case: c, sectionNumber: s.number, sectionPath: next.join(' › ') })
     }
     s.children.forEach((child) => walk(child, next))
   }
@@ -1044,29 +1037,33 @@ a { color: inherit; text-decoration: none; }
 
 /* Cases live entirely in the content column of the 2-column section grid
  * (number | content). Padding-left = rail width + gap, so every case row
- * sits below — and aligned with — its section title. */
+ * sits below — and aligned with — its section title. The whole row is
+ * a link to the corresponding detail entry. */
 .cases {
   list-style: none;
   margin: 0;
   padding: 0 0 0 calc(var(--rail-w) + var(--rail-gap));
 }
 .case {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 4mm;
-  align-items: start;
-  padding: 1.6mm 0;
   border-bottom: 1px solid hsl(var(--border));
   break-inside: avoid;
   page-break-inside: avoid;
 }
 .case:last-child { border-bottom: none; }
-.case__rail { padding-top: 0.2mm; }
 
+.case__link {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 4mm;
+  align-items: start;
+  padding: 1.6mm 0;
+  color: inherit;
+}
+.case__rail { padding-top: 0.2mm; }
 .case__body { display: flex; flex-direction: column; gap: 1mm; min-width: 0; }
 .case__row {
   display: grid;
-  grid-template-columns: 1fr auto 5mm;
+  grid-template-columns: 1fr auto;
   gap: 4mm;
   align-items: baseline;
 }
@@ -1086,13 +1083,6 @@ a { color: inherit; text-decoration: none; }
   white-space: nowrap;
   font-feature-settings: "tnum" 1;
 }
-.case__arrow {
-  text-align: right;
-  font-size: 9pt;
-  color: hsl(var(--muted-foreground));
-  line-height: 1;
-}
-.case__arrow--placeholder { color: transparent; }
 .case__chips { display: flex; flex-wrap: wrap; gap: 1mm; }
 
 /* ────────────────────────────────────────────────────────────────────────── *
