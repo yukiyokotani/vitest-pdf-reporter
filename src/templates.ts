@@ -1044,11 +1044,15 @@ a { color: inherit; text-decoration: none; }
  *  CASES                                                                       *
  * ────────────────────────────────────────────────────────────────────────── */
 
-.cases { list-style: none; margin: 0; padding: 0; }
+/* Cases live entirely in the content column of the 2-column section grid
+ * (number | content). Padding-left = rail width + gap, so every case row
+ * sits below — and aligned with — its section title. */
+.cases {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 calc(var(--rail-w) + var(--rail-gap));
+}
 .case {
-  /* Cases sit indented under their section header so the section number
-   * and the status badge don't share the same left edge. */
-  margin-left: 8mm;
   display: grid;
   grid-template-columns: auto 1fr;
   column-gap: 4mm;
