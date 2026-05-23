@@ -1,0 +1,66 @@
+{
+  "name": "vitest-pdf-reporter",
+  "version": "0.1.0",
+  "description": "A Vitest custom reporter that renders test results as a beautifully typeset PDF spec document.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "example": "pnpm --filter vitest-pdf-reporter-example test",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "vitest",
+    "reporter",
+    "pdf",
+    "test-report",
+    "spec",
+    "documentation",
+    "playwright"
+  ],
+  "author": "Yuki Yokotani <yokotani.yuki@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yukiyokotani/vitest-pdf-reporter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yukiyokotani/vitest-pdf-reporter/issues"
+  },
+  "homepage": "https://github.com/yukiyokotani/vitest-pdf-reporter#readme",
+  "peerDependencies": {
+    "playwright": ">=1.40.0",
+    "vitest": ">=2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "playwright": "^1.49.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

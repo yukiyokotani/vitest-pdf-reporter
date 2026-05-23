@@ -1,0 +1,15 @@
+src
+tests
+examples
+docs
+node_modules
+.github
+.claude
+.vscode
+.idea
+*.tsbuildinfo
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+justfile
+.gitignore
