@@ -87,11 +87,26 @@ const L = {
 } as const
 
 /* -------------------------------------------------------------------------- */
-/*  Status badge as a shadcn Badge                                             */
+/*  Status badge as a shadcn Badge with lucide-style icon                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Inline lucide-style icons matching the ones shadcn pairs with status
+ * badges in its examples: `Check` for pass, `X` for fail, `Minus` for skip,
+ * and a dashed circle for the "not yet started" todo state.
+ */
+function statusIcon(s: TestStatus): string {
+  const open = '<svg class="badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  switch (s) {
+    case 'pass': return `${open}<path d="M20 6 9 17l-5-5"/></svg>`
+    case 'fail': return `${open}<path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>`
+    case 'skip': return `${open}<path d="M5 12h14"/></svg>`
+    case 'todo': return `<svg class="badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2.4 3.2"/></svg>`
+  }
+}
+
 function statusBadge(s: TestStatus): string {
-  return `<span class="badge ${statusBadgeVariant(s)} badge--status">${statusLabel(s)}</span>`
+  return `<span class="badge ${statusBadgeVariant(s)} badge--status">${statusIcon(s)}<span class="badge__text">${statusLabel(s)}</span></span>`
 }
 
 /* -------------------------------------------------------------------------- */
@@ -241,7 +256,7 @@ function failureRow(f: ViewFailure): string {
   return `
   <li class="failure-row">
     <a class="failure-row__link" href="#${esc(f.caseId)}">
-      <span class="badge badge--destructive badge--status">FAIL</span>
+      ${statusBadge('fail')}
       <div class="failure-row__body">
         <div class="failure-row__top">
           <span class="failure-row__num mono">${esc(f.sectionNumber)}</span>
@@ -541,13 +556,31 @@ a { color: inherit; text-decoration: none; }
   font-weight: 500;
 }
 
-/* Fixed-width status badge so PASS / FAIL / SKIP / TODO all align. */
-.badge--status {
-  min-width: 14mm;
-  padding: 0.8mm 1.6mm;
+/* Status badge — uniform geometry across every variant so PASS / FAIL /
+ * SKIP / TODO sit at the exact same height, width and weight in the rail. */
+.badge--status,
+.badge--status.badge--outline,
+.badge--status.badge--success,
+.badge--status.badge--destructive,
+.badge--status.badge--muted,
+.badge--status.badge--secondary,
+.badge--status.badge--warning {
+  min-width: 16mm;
+  height: 5mm;
+  padding: 0 2mm;
+  gap: 1mm;
   font-size: 7.4pt;
+  font-weight: 700;
   letter-spacing: 0.08em;
+  line-height: 1;
 }
+.badge__icon {
+  width: 2.8mm;
+  height: 2.8mm;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.badge__text { display: inline-block; line-height: 1; }
 
 .eyebrow {
   display: inline-block;
