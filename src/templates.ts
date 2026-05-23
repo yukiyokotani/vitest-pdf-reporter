@@ -438,7 +438,7 @@ function styles(theme: 'default' | 'minimal'): string {
     --warning: 240 5.9% 35%;
     --warning-foreground: 0 0% 98%;
     --warning-soft: 240 4.8% 95.9%;
-    --radius: 6px;
+    --radius: 8px;
     --rail-w: 20mm;
     --rail-gap: 5mm;
       `
@@ -462,7 +462,7 @@ function styles(theme: 'default' | 'minimal'): string {
     --warning: 38 92% 42%;
     --warning-foreground: 0 0% 98%;
     --warning-soft: 48 96% 93%;
-    --radius: 6px;
+    --radius: 8px;
     --rail-w: 20mm;
     --rail-gap: 5mm;
       `
@@ -557,7 +557,8 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* Status badge — uniform geometry across every variant so PASS / FAIL /
- * SKIP / TODO sit at the exact same height, width and weight in the rail. */
+ * SKIP / TODO sit at the exact same height, width and weight in the rail.
+ * Fully rounded pill shape (shadcn's recommended look for status chips). */
 .badge--status,
 .badge--status.badge--outline,
 .badge--status.badge--success,
@@ -567,12 +568,13 @@ a { color: inherit; text-decoration: none; }
 .badge--status.badge--warning {
   min-width: 16mm;
   height: 5mm;
-  padding: 0 2mm;
+  padding: 0 2.4mm;
   gap: 1mm;
   font-size: 7.4pt;
   font-weight: 700;
   letter-spacing: 0.08em;
   line-height: 1;
+  border-radius: 999px;
 }
 .badge__icon {
   width: 2.8mm;
