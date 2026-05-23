@@ -953,7 +953,7 @@ a { color: inherit; text-decoration: none; }
   gap: var(--rail-gap);
   align-items: baseline;
   padding-bottom: 2.6mm;
-  border-bottom: 2px solid hsl(var(--foreground));
+  border-bottom: 1px solid hsl(var(--foreground));
   margin-bottom: 4mm;
 }
 /* Section summary: two fixed-width columns ("X/Y" and "Z%") aligned to
