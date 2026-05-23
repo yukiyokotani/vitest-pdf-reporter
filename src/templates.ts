@@ -108,7 +108,7 @@ function whiteStrokes(paths: string[]): string {
   return paths
     .map(
       (d) =>
-        `<path d="${d}" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+        `<path d="${d}" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
     )
     .join('')
 }
@@ -139,7 +139,7 @@ function errorIcon(): string {
 }
 
 function statusBadge(s: TestStatus): string {
-  return `<span class="badge ${statusBadgeVariant(s)} badge--status">${statusIcon(s)}<span class="badge__text">${statusLabel(s)}</span></span>`
+  return `<span class="badge ${statusBadgeVariant(s)}">${statusIcon(s)}${statusLabel(s)}</span>`
 }
 
 /* -------------------------------------------------------------------------- */
@@ -351,7 +351,7 @@ function renderError(c: ViewCase, includeStack: boolean): string {
   return `
     <div class="error" role="alert">
       <div class="error__head">
-        <span class="badge badge--destructive badge--status">${errorIcon()}<span class="badge__text">${esc(L.error)}</span></span>
+        <span class="badge badge--destructive">${errorIcon()}${esc(L.error)}</span>
         <span class="error__msg mono">${esc(c.error.message)}</span>
       </div>
       ${diff}
@@ -590,25 +590,28 @@ a { color: inherit; text-decoration: none; }
  * anywhere in this document. Variants differentiate via border + text +
  * icon color, never via fill. Geometry (padding, font-size, border-
  * radius, weight) is identical across all variants. */
-/* All badges are outline pills. The text is always foreground (black).
- * Variants tint the border and the badge icon only — never the text or
- * the fill. */
+/* Badge — shadcn-faithful defaults. The shadcn source uses:
+ *   inline-flex items-center justify-center rounded-md border
+ *   px-2 py-0.5 text-xs font-medium [&>svg]:size-3 gap-1
+ * Variants tint the border + icon accent only. Text is always
+ * foreground (black). No fills. */
 .badge {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  justify-content: center;
+  border-radius: calc(var(--radius) - 2px);
   background: transparent;
   border: 1px solid hsl(var(--border-strong));
   color: hsl(var(--foreground));
-  padding: 0.6mm 2.4mm;
+  padding: 0.4mm 1.6mm;
   font-size: 7pt;
   font-weight: 500;
   line-height: 1;
+  gap: 0.8mm;
   white-space: nowrap;
   font-feature-settings: "tnum" 1;
-  gap: 1.2mm;
 }
-.badge--outline { /* default — neutral border, neutral icon */ }
+.badge--outline { /* default neutral */ }
 .badge--destructive { border-color: hsl(var(--destructive)); }
 .badge--success { border-color: hsl(var(--success)); }
 .badge--warning { border-color: hsl(var(--warning)); }
@@ -616,20 +619,10 @@ a { color: inherit; text-decoration: none; }
 .badge--secondary { border-color: hsl(var(--border-strong)); }
 .badge--default { border-color: hsl(var(--foreground)); }
 
-/* Status pill — same outline pill as every other badge, with a slightly
- * heavier weight so the test outcome reads as functional emphasis. */
-.badge--status {
-  font-weight: 600;
-  padding: 0.6mm 2.6mm 0.6mm 1.6mm;
-}
-
-/* Badge icons follow the lucide BadgeCheck / BadgeX / BadgeMinus /
- * BadgeQuestionMark / BadgeAlert family: the petal shape is filled by
- * the variant accent color (currentColor on the icon), and the inner
- * symbol is stroked in white inside that shape. */
+/* shadcn icon sizing: [&>svg]:size-3 → 12px on web ≈ 2.5mm at print. */
 .badge__icon {
-  width: 3.2mm;
-  height: 3.2mm;
+  width: 2.5mm;
+  height: 2.5mm;
   flex-shrink: 0;
   display: block;
   color: hsl(var(--muted-foreground));
@@ -638,7 +631,6 @@ a { color: inherit; text-decoration: none; }
 .badge--success .badge__icon { color: hsl(var(--success)); }
 .badge--warning .badge__icon { color: hsl(var(--warning)); }
 .badge--muted .badge__icon { color: hsl(var(--muted-foreground)); }
-.badge__text { display: inline-block; line-height: 1; }
 
 .eyebrow {
   display: inline-block;
