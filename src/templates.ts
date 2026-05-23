@@ -35,10 +35,14 @@ function fmtDuration(ms: number): string {
 }
 
 function statusBadgeVariant(s: TestStatus): string {
-  // Only FAIL gets a color treatment — it's the one outcome that demands
-  // the reader's attention. PASS / SKIP / TODO are neutral outline so the
-  // page reads in black and gray with red strictly reserved for signal.
-  return s === 'fail' ? 'badge--destructive' : 'badge--outline'
+  // Each status maps to a tinted variant: green / red / gray / neutral.
+  // The variant tints the badge border + icon accent; text stays black.
+  switch (s) {
+    case 'pass': return 'badge--success'
+    case 'fail': return 'badge--destructive'
+    case 'skip': return 'badge--muted'
+    case 'todo': return 'badge--outline'
+  }
 }
 
 function statusLabel(s: TestStatus): string {
@@ -87,18 +91,51 @@ const L = {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Inline lucide-style icons matching the ones shadcn pairs with status
- * badges in its examples: `Check` for pass, `X` for fail, `Minus` for skip,
- * and a dashed circle for the "not yet started" todo state.
+ * Lucide `BadgeCheck` / `BadgeX` / `BadgeMinus` / `BadgeQuestionMark`
+ * icons rendered in filled style: the badge petal shape is painted with
+ * `currentColor` (the accent color set by the parent variant) and the
+ * inner symbol is stroked in white, producing the "white symbol carved
+ * out of an accent-colored badge" look that shadcn uses on status chips.
  */
+const BADGE_SHAPE =
+  '<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" fill="currentColor" stroke="none"/>'
+
+function wrapIcon(children: string): string {
+  return `<svg class="badge__icon" viewBox="0 0 24 24" aria-hidden="true">${children}</svg>`
+}
+
+function whiteStrokes(paths: string[]): string {
+  return paths
+    .map(
+      (d) =>
+        `<path d="${d}" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    )
+    .join('')
+}
+
 function statusIcon(s: TestStatus): string {
-  const open = '<svg class="badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
   switch (s) {
-    case 'pass': return `${open}<path d="M20 6 9 17l-5-5"/></svg>`
-    case 'fail': return `${open}<path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>`
-    case 'skip': return `${open}<path d="M5 12h14"/></svg>`
-    case 'todo': return `<svg class="badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2.4 3.2"/></svg>`
+    case 'pass':
+      return wrapIcon(BADGE_SHAPE + whiteStrokes(['m9 12 2 2 4-4']))
+    case 'fail':
+      return wrapIcon(BADGE_SHAPE + whiteStrokes(['m15 9-6 6', 'm9 9 6 6']))
+    case 'skip':
+      return wrapIcon(BADGE_SHAPE + whiteStrokes(['M8 12h8']))
+    case 'todo':
+      return wrapIcon(
+        BADGE_SHAPE +
+          whiteStrokes(['M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3']) +
+          '<circle cx="12" cy="17" r="0.9" fill="white"/>',
+      )
   }
+}
+
+function errorIcon(): string {
+  return wrapIcon(
+    BADGE_SHAPE +
+      whiteStrokes(['M12 8v4']) +
+      '<circle cx="12" cy="16" r="0.9" fill="white"/>',
+  )
 }
 
 function statusBadge(s: TestStatus): string {
@@ -314,7 +351,7 @@ function renderError(c: ViewCase, includeStack: boolean): string {
   return `
     <div class="error" role="alert">
       <div class="error__head">
-        <span class="badge badge--destructive">${esc(L.error)}</span>
+        <span class="badge badge--destructive badge--status">${errorIcon()}<span class="badge__text">${esc(L.error)}</span></span>
         <span class="error__msg mono">${esc(c.error.message)}</span>
       </div>
       ${diff}
@@ -553,6 +590,9 @@ a { color: inherit; text-decoration: none; }
  * anywhere in this document. Variants differentiate via border + text +
  * icon color, never via fill. Geometry (padding, font-size, border-
  * radius, weight) is identical across all variants. */
+/* All badges are outline pills. The text is always foreground (black).
+ * Variants tint the border and the badge icon only — never the text or
+ * the fill. */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -566,49 +606,38 @@ a { color: inherit; text-decoration: none; }
   line-height: 1;
   white-space: nowrap;
   font-feature-settings: "tnum" 1;
+  gap: 1.2mm;
 }
-.badge--outline {
-  /* Default border + foreground text — the "neutral" variant. */
-}
-.badge--destructive {
-  border-color: hsl(var(--destructive) / 0.6);
-  color: hsl(var(--destructive));
-}
-.badge--success {
-  border-color: hsl(var(--success) / 0.6);
-  color: hsl(var(--success));
-}
-.badge--warning {
-  border-color: hsl(var(--warning) / 0.6);
-  color: hsl(var(--warning));
-}
-.badge--muted {
-  border-color: hsl(var(--border-strong));
-  color: hsl(var(--muted-foreground));
-}
-.badge--secondary {
-  border-color: hsl(var(--border-strong));
-  color: hsl(var(--foreground));
-}
-.badge--default {
-  border-color: hsl(var(--foreground));
-  color: hsl(var(--foreground));
+.badge--outline { /* default — neutral border, neutral icon */ }
+.badge--destructive { border-color: hsl(var(--destructive)); }
+.badge--success { border-color: hsl(var(--success)); }
+.badge--warning { border-color: hsl(var(--warning)); }
+.badge--muted { border-color: hsl(var(--border-strong)); }
+.badge--secondary { border-color: hsl(var(--border-strong)); }
+.badge--default { border-color: hsl(var(--foreground)); }
+
+/* Status pill — same outline pill as every other badge, with a slightly
+ * heavier weight so the test outcome reads as functional emphasis. */
+.badge--status {
+  font-weight: 600;
+  padding: 0.6mm 2.6mm 0.6mm 1.6mm;
 }
 
-/* Status pill — outline like every other badge, just rounded fully and a
- * touch heavier so it reads as functional emphasis (the test outcome
- * matters; metadata chips do not). */
-.badge--status {
-  gap: 1mm;
-  border-radius: 999px;
-  font-weight: 600;
-}
+/* Badge icons follow the lucide BadgeCheck / BadgeX / BadgeMinus /
+ * BadgeQuestionMark / BadgeAlert family: the petal shape is filled by
+ * the variant accent color (currentColor on the icon), and the inner
+ * symbol is stroked in white inside that shape. */
 .badge__icon {
-  width: 2.8mm;
-  height: 2.8mm;
+  width: 3.2mm;
+  height: 3.2mm;
   flex-shrink: 0;
-  display: inline-block;
+  display: block;
+  color: hsl(var(--muted-foreground));
 }
+.badge--destructive .badge__icon { color: hsl(var(--destructive)); }
+.badge--success .badge__icon { color: hsl(var(--success)); }
+.badge--warning .badge__icon { color: hsl(var(--warning)); }
+.badge--muted .badge__icon { color: hsl(var(--muted-foreground)); }
 .badge__text { display: inline-block; line-height: 1; }
 
 .eyebrow {
@@ -1011,7 +1040,6 @@ a { color: inherit; text-decoration: none; }
   color: hsl(var(--foreground));
   line-height: 1.3;
 }
-.case.is-fail .case__name { color: hsl(var(--destructive)); }
 .case.is-skip .case__name,
 .case.is-todo .case__name { color: hsl(var(--muted-foreground)); }
 .case__duration {
@@ -1073,7 +1101,6 @@ a { color: inherit; text-decoration: none; }
   color: hsl(var(--foreground));
   line-height: 1.25;
 }
-.detail.is-fail .detail__name { color: hsl(var(--destructive)); }
 .detail__duration {
   font-size: 8pt;
   color: hsl(var(--muted-foreground));
@@ -1129,8 +1156,8 @@ a { color: inherit; text-decoration: none; }
 
 .error {
   margin-top: 1mm;
-  background: hsl(var(--destructive-soft));
-  border: 1px solid hsl(var(--destructive) / 0.25);
+  background: transparent;
+  border: 1px solid hsl(var(--destructive) / 0.5);
   border-radius: var(--radius);
   padding: 2.4mm 3mm;
 }
@@ -1142,7 +1169,7 @@ a { color: inherit; text-decoration: none; }
 }
 .error__msg {
   font-size: 8.4pt;
-  color: hsl(var(--destructive));
+  color: hsl(var(--foreground));
   font-weight: 600;
   word-break: break-word;
   line-height: 1.3;
@@ -1152,8 +1179,8 @@ a { color: inherit; text-decoration: none; }
   font-size: 7pt;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: hsl(var(--destructive));
-  font-weight: 700;
+  color: hsl(var(--muted-foreground));
+  font-weight: 600;
   margin-bottom: 1mm;
 }
 .error__pre {
