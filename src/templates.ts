@@ -1012,9 +1012,12 @@ a { color: inherit; text-decoration: none; }
 
 .cases { list-style: none; margin: 0; padding: 0; }
 .case {
+  /* Cases sit indented under their section header so the section number
+   * and the status badge don't share the same left edge. */
+  margin-left: 8mm;
   display: grid;
-  grid-template-columns: var(--rail-w) 1fr;
-  gap: var(--rail-gap);
+  grid-template-columns: auto 1fr;
+  column-gap: 4mm;
   align-items: start;
   padding: 1.6mm 0;
   border-bottom: 1px solid hsl(var(--border));
