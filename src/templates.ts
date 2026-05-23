@@ -1052,8 +1052,11 @@ a { color: inherit; text-decoration: none; }
 .case:last-child { border-bottom: none; }
 
 .case__link {
+  /* Fixed badge column so every test title starts at the same x. The
+   * width is sized to fit the widest of PASS / FAIL / SKIP / TODO at
+   * 7pt with shadcn padding + icon + gap (~13mm) plus a hair of slack. */
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 15mm 1fr;
   column-gap: 4mm;
   align-items: start;
   padding: 1.6mm 0;
